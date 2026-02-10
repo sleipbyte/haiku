@@ -792,8 +792,9 @@ TreeDirectory::Lookup(const char* name, size_t length, xfs_ino_t* ino)
 			ExtentDataEntry* entry
 				= (ExtentDataEntry*)(fSingleDirBlock + offset);
 
-			int retVal = strncmp(name, (char*)entry->name, entry->namelen);
-			if (retVal == 0) {
+			bool is_equal = length == entry->namelen 
+				&& (memcmp(name, entry->name, entry->namelen) == 0);
+			if (is_equal) {
 				*ino = B_BENDIAN_TO_HOST_INT64(entry->inumber);
 				TRACE("ino:(%" B_PRIu64 ")\n", *ino);
 				return B_OK;
