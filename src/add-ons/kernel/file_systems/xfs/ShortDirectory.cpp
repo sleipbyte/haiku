@@ -162,7 +162,7 @@ ShortDirectory::GetNext(char* name, size_t* length, xfs_ino_t* ino)
 			fLastEntryOffset = curOffset;
 			memcpy(name, entry->name, entry->namelen);
 			name[entry->namelen] = '\0';
-			*length = entry->namelen + 1;
+			*length = entry->namelen;
 			*ino = GetEntryIno(entry);
 			TRACE("Entry found. Name: (%s), Length: (%" B_PRIuSIZE "),ino: (%" B_PRIu64 ")\n",
 				name,*length, *ino);
