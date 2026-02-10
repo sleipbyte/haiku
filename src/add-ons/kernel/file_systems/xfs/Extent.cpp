@@ -199,7 +199,7 @@ Extent::GetNext(char* name, size_t* length, xfs_ino_t* ino)
 		fOffset = currentOffset;
 		memcpy(name, dataEntry->name, dataEntry->namelen);
 		name[dataEntry->namelen] = '\0';
-		*length = dataEntry->namelen + 1;
+		*length = dataEntry->namelen;
 		*ino = B_BENDIAN_TO_HOST_INT64(dataEntry->inumber);
 
 		TRACE("Entry found. Name: (%s), Length: (%" B_PRIuSIZE "),ino: (%" B_PRIu64 ")\n", name,
