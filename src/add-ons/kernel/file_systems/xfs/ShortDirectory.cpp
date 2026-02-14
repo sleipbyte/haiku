@@ -108,9 +108,7 @@ ShortDirectory::Lookup(const char* name, size_t length, xfs_ino_t* ino)
 		"(%" B_PRIu16 ")\n", entry->namelen, B_BENDIAN_TO_HOST_INT16(entry->offset.i));
 
 	for (int i = 0; i < fHeader->count; i++) {
-		bool is_equal = length == entry->namelen 
-			&& (memcmp(name, entry->name, entry->namelen) == 0);
-		if (is_equal) {
+		if (xfs_da_name_comp(name, length, entry->name, entry->namelen)) {
 			*ino = GetEntryIno(entry);
 			return B_OK;
 		}

@@ -10,6 +10,7 @@
 #include "Directory.h"
 #include "Inode.h"
 #include "system_dependencies.h"
+#include "Utility.h"
 
 
 #define DIR2_BLOCK_HEADER_MAGIC 0x58443242

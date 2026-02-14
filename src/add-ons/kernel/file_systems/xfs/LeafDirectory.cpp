@@ -381,9 +381,7 @@ LeafDirectory::Lookup(const char* name, size_t length, xfs_ino_t* ino)
 		TRACE("offset:(%" B_PRIu32 ")\n", offset);
 		ExtentDataEntry* entry = (ExtentDataEntry*)(fDataBuffer + offset);
 
-		bool is_equal = length == entry->namelen 
-			&& (memcmp(name, entry->name, entry->namelen) == 0);
-		if (is_equal) {
+		if (xfs_da_name_comp(name, length, entry->name, entry->namelen)) {
 			*ino = B_BENDIAN_TO_HOST_INT64(entry->inumber);
 			TRACE("ino:(%" B_PRIu64 ")\n", *ino);
 			return B_OK;
