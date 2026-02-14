@@ -9,6 +9,7 @@
 #include "Directory.h"
 #include "Extent.h"
 #include "LeafDirectory.h"
+#include "Utility.h"
 
 
 #define XFS_DIR2_LEAFN_MAGIC (0xd2ff)

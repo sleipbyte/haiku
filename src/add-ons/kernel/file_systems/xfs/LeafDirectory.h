@@ -11,6 +11,7 @@
 #include "Extent.h"
 #include "Inode.h"
 #include "system_dependencies.h"
+#include "Utility.h"
 
 
 #define V4_DATA_HEADER_MAGIC 0x58443244
