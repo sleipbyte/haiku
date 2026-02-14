@@ -5,6 +5,7 @@
 #ifndef UTILITY_H
 #define UTILITY_H
 
+<<<<<<< HEAD
 
 // returns true if name1 and name2 matches
 inline bool
@@ -77,6 +78,13 @@ hashLowerBound(T* entry, int& left, int& right, uint32 hashValueOfRequest)
 			left = mid + 1;
 	}
 	TRACE("left:(%" B_PRId32 "), right:(%" B_PRId32 ")\n", left, right);
+=======
+// returns true if name1 and name2 matches
+static inline bool 
+xfs_da_name_comp(const char* name1, size_t length1, const unsigned char* name2, size_t length2)
+{
+    return length1 == length2 && memcmp(name1, name2, length1) == 0;
+>>>>>>> c40a6c696b (Alternate implementation of d9d7262936)
 }
 
 #endif // UTILITY_H
