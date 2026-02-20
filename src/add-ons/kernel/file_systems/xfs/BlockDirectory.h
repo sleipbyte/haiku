@@ -3,8 +3,8 @@
  * Copyright 2020, Shubham Bhagat, shubhambhagat111@yahoo.com
  * All rights reserved. Distributed under the terms of the MIT License.
  */
-#ifndef _EXTENT_H_
-#define _EXTENT_H_
+#ifndef _BLOCK_DIRECTORY_H_
+#define _BLOCK_DIRECTORY_H_
 
 
 #include "Directory.h"
@@ -43,10 +43,10 @@ struct FreeRegion {
 
 
 // This class will act as interface for V4 and V5 data header
-class ExtentDataHeader
+class DataHeader
 {
 public:
-			virtual						~ExtentDataHeader()			=	0;
+			virtual						~DataHeader()				=	0;
 			virtual	uint32				Magic()						=	0;
 			virtual	uint64				Blockno()					=	0;
 			virtual	uint64				Lsn()						=	0;
@@ -56,13 +56,13 @@ public:
 			static	uint32				ExpectedMagic(int8 WhichDirectory,
 										Inode* inode);
 			static	uint32				CRCOffset();
-			static	ExtentDataHeader*	Create(Inode* inode, const char* buffer);
+			static	DataHeader*			Create(Inode* inode, const char* buffer);
 			static	uint32				Size(Inode* inode);
 };
 
 
 // xfs_dir_data_hdr_t
-class ExtentDataHeaderV4 : public ExtentDataHeader
+class DataHeaderV4 : public DataHeader
 {
 public :
 			struct	OnDiskData {
@@ -71,8 +71,8 @@ public :
 					FreeRegion			bestfree[XFS_DIR2_DATA_FD_COUNT];
 			};
 
-								ExtentDataHeaderV4(const char* buffer);
-								~ExtentDataHeaderV4();
+								DataHeaderV4(const char* buffer);
+								~DataHeaderV4();
 			uint32				Magic();
 			uint64				Blockno();
 			uint64				Lsn();
@@ -88,7 +88,7 @@ private:
 
 
 // xfs_dir3_data_hdr_t
-class ExtentDataHeaderV5 : public ExtentDataHeader
+class DataHeaderV5 : public DataHeader
 {
 public:
 			struct OnDiskData {
@@ -103,8 +103,8 @@ public:
 				uint32				pad;
 			};
 
-								ExtentDataHeaderV5(const char* buffer);
-								~ExtentDataHeaderV5();
+								DataHeaderV5(const char* buffer);
+								~DataHeaderV5();
 			uint32				Magic();
 			uint64				Blockno();
 			uint64				Lsn();
@@ -120,10 +120,10 @@ private:
 
 
 // xfs_dir2_data_entry_t
-struct ExtentDataEntry {
+struct DataEntry {
 			xfs_ino_t			inumber;
 			uint8				namelen;
-			uint8				name[];
+			char				name[];
 
 // Followed by a file type (8bit) if applicable and a 16bit tag
 // tag is the offset from start of the block
@@ -131,7 +131,7 @@ struct ExtentDataEntry {
 
 
 // xfs_dir2_data_unused_t
-struct ExtentUnusedEntry {
+struct UnusedEntry {
 			uint16				freetag;
 				// takes the value 0xffff
 			uint16				length;
@@ -141,7 +141,7 @@ struct ExtentUnusedEntry {
 
 
 // xfs_dir2_leaf_entry_t
-struct ExtentLeafEntry {
+struct LeafEntry {
 			uint32				hashval;
 			uint32				address;
 				// offset into block after >> 3
@@ -149,7 +149,7 @@ struct ExtentLeafEntry {
 
 
 // xfs_dir2_block_tail_t
-struct ExtentBlockTail {
+struct BlockTail {
 			uint32				count;
 				// # of entries in leaf
 			uint32				stale;
@@ -157,16 +157,16 @@ struct ExtentBlockTail {
 };
 
 
-class Extent : public DirectoryIterator {
+class BlockDirectory : public DirectoryIterator {
 public:
-								Extent(Inode* inode);
-								~Extent();
+								BlockDirectory(Inode* inode);
+								~BlockDirectory();
 			status_t			Init();
 			bool				IsBlockType();
 			void				FillMapEntry(void* pointerToMap);
 			status_t			FillBlockBuffer();
-			ExtentBlockTail*	BlockTail();
-			ExtentLeafEntry*	BlockFirstLeaf(ExtentBlockTail* tail);
+			BlockTail*			GetBlockTail();
+			LeafEntry*			BlockFirstLeaf(BlockTail* tail);
 			xfs_ino_t			GetIno();
 			uint32				GetOffsetFromAddress(uint32 address);
 			int					EntrySize(int len) const;

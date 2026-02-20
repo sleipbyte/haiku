@@ -8,7 +8,7 @@
 
 #include "BPlusTree.h"
 #include "Checksum.h"
-#include "Extent.h"
+#include "BlockDirectory.h"
 #include "Inode.h"
 #include "LeafDirectory.h"
 #include "Node.h"

@@ -137,10 +137,10 @@ NodeDirectory::FillBuffer(int type, char* blockBuffer, int howManyBlocksFurthur)
 
 	if (type == DATA) {
 		fDataBuffer = blockBuffer;
-		ExtentDataHeader* header = ExtentDataHeader::Create(fInode, fDataBuffer);
+		DataHeader* header = DataHeader::Create(fInode, fDataBuffer);
 		if(header == NULL)
 			return B_NO_MEMORY;
-		if (!VerifyHeader<ExtentDataHeader>(header, fDataBuffer, fInode,
+		if (!VerifyHeader<DataHeader>(header, fDataBuffer, fInode,
 				howManyBlocksFurthur, fDataMap, XFS_NODE)) {
 			ERROR("DATA BLOCK INVALID\n");
 			delete header;
@@ -154,13 +154,13 @@ NodeDirectory::FillBuffer(int type, char* blockBuffer, int howManyBlocksFurthur)
 			This could be leaf or node block perform check for both
 			based on magic number found.
 		*/
-		ExtentLeafHeader* leaf = ExtentLeafHeader::Create(fInode, fLeafBuffer);
+		LeafHeader* leaf = LeafHeader::Create(fInode, fLeafBuffer);
 		if (leaf == NULL)
 			return B_NO_MEMORY;
 
 		if ((leaf->Magic() == XFS_DIR2_LEAFN_MAGIC
 				|| leaf->Magic() == XFS_DIR3_LEAFN_MAGIC)
-			&& !VerifyHeader<ExtentLeafHeader>(leaf, fLeafBuffer, fInode,
+			&& !VerifyHeader<LeafHeader>(leaf, fLeafBuffer, fInode,
 				howManyBlocksFurthur, fLeafMap, XFS_NODE)) {
 			TRACE("Leaf block invalid");
 			delete leaf;
@@ -277,7 +277,7 @@ NodeDirectory::GetNext(char* name, size_t* length, xfs_ino_t* ino)
 
 	void* entry; // This could be unused entry so we should check
 
-	entry = (void*)(fDataBuffer + ExtentDataHeader::Size(fInode));
+	entry = (void*)(fDataBuffer + DataHeader::Size(fInode));
 
 	uint32 blockNoFromAddress = BLOCKNO_FROM_ADDRESS(fOffset, volume);
 	if (fOffset != 0 && blockNoFromAddress == fCurBlockNumber) {
@@ -303,8 +303,8 @@ NodeDirectory::GetNext(char* name, size_t* length, xfs_ino_t* ino)
 				blockNoFromAddress - fDataMap->br_startoff);
 			if (status != B_OK)
 				return status;
-			entry = (void*)(fDataBuffer + ExtentDataHeader::Size(fInode));
-			fOffset = fOffset + ExtentDataHeader::Size(fInode);
+			entry = (void*)(fDataBuffer + DataHeader::Size(fInode));
+			fOffset = fOffset + DataHeader::Size(fInode);
 			fCurBlockNumber = blockNoFromAddress;
 		} else if (fCurBlockNumber != blockNoFromAddress) {
 			// When the block isn't mapped in the current data map entry
@@ -313,12 +313,12 @@ NodeDirectory::GetNext(char* name, size_t* length, xfs_ino_t* ino)
 				blockNoFromAddress - fDataMap->br_startoff);
 			if (status != B_OK)
 				return status;
-			entry = (void*)(fDataBuffer + ExtentDataHeader::Size(fInode));
-			fOffset = fOffset + ExtentDataHeader::Size(fInode);
+			entry = (void*)(fDataBuffer + DataHeader::Size(fInode));
+			fOffset = fOffset + DataHeader::Size(fInode);
 			fCurBlockNumber = blockNoFromAddress;
 		}
 
-		ExtentUnusedEntry* unusedEntry = (ExtentUnusedEntry*)entry;
+		UnusedEntry* unusedEntry = (UnusedEntry*)entry;
 
 		if (B_BENDIAN_TO_HOST_INT16(unusedEntry->freetag) == DIR2_FREE_TAG) {
 			TRACE("Unused entry found\n");
@@ -327,7 +327,7 @@ NodeDirectory::GetNext(char* name, size_t* length, xfs_ino_t* ino)
 				((char*)entry + B_BENDIAN_TO_HOST_INT16(unusedEntry->length));
 			continue;
 		}
-		ExtentDataEntry* dataEntry = (ExtentDataEntry*) entry;
+		DataEntry* dataEntry = (DataEntry*) entry;
 
 		uint16 currentOffset = (char*)dataEntry - fDataBuffer;
 		TRACE("GetNext: fOffset:(%" B_PRIu32 "), currentOffset:(%" B_PRIu16 ")\n",
@@ -397,11 +397,11 @@ NodeDirectory::Lookup(const char* name, size_t length, xfs_ino_t* ino)
 		if (status != B_OK)
 			return status;
 		fCurLeafBufferNumber = 2;
-		ExtentLeafHeader* leafHeader = ExtentLeafHeader::Create(fInode, fLeafBuffer);
+		LeafHeader* leafHeader = LeafHeader::Create(fInode, fLeafBuffer);
 		if(leafHeader == NULL)
 			return B_NO_MEMORY;
-		ExtentLeafEntry* leafEntry =
-			(ExtentLeafEntry*)(void*)(fLeafBuffer + ExtentLeafHeader::Size(fInode));
+		LeafEntry* leafEntry =
+			(LeafEntry*)(void*)(fLeafBuffer + LeafHeader::Size(fInode));
 		if (leafEntry == NULL)
 			return B_NO_MEMORY;
 
@@ -411,7 +411,7 @@ NodeDirectory::Lookup(const char* name, size_t length, xfs_ino_t* ino)
 		int right = numberOfLeafEntries - 1;
 		Volume* volume = fInode->GetVolume();
 
-		hashLowerBound<ExtentLeafEntry>(leafEntry, left, right, hashValueOfRequest);
+		hashLowerBound<LeafEntry>(leafEntry, left, right, hashValueOfRequest);
 
 		while (B_BENDIAN_TO_HOST_INT32(leafEntry[left].hashval)
 				== hashValueOfRequest) {
@@ -437,7 +437,7 @@ NodeDirectory::Lookup(const char* name, size_t length, xfs_ino_t* ino)
 			}
 
 			TRACE("offset:(%" B_PRIu32 ")\n", offset);
-			ExtentDataEntry* entry = (ExtentDataEntry*)(fDataBuffer + offset);
+			DataEntry* entry = (DataEntry*)(fDataBuffer + offset);
 
 			if (xfs_da_name_comp(name, length, entry->name, entry->namelen)) {
 				*ino = B_BENDIAN_TO_HOST_INT64(entry->inumber);

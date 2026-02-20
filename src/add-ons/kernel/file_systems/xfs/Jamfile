@@ -22,16 +22,16 @@ UseHeaders [ FDirName $(HAIKU_TOP) src add-ons kernel file_systems shared ] : tr
 
 local xfsSources =
 	Attribute.cpp
+	BlockDirectory.cpp
 	BPlusTree.cpp
 	Directory.cpp
-	Extent.cpp
 	Inode.cpp
 	kernel_cpp.cpp
 	kernel_interface.cpp
 	LeafAttribute.cpp
 	LeafDirectory.cpp
-	Node.cpp
 	NodeAttribute.cpp
+	NodeDirectory.cpp
 	ShortAttribute.cpp
 	ShortDirectory.cpp
 	Symlink.cpp

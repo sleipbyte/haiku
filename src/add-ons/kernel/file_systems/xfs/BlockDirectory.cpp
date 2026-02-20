@@ -5,12 +5,12 @@
  */
 
 
-#include "Extent.h"
+#include "BlockDirectory.h"
 
 #include "VerifyHeader.h"
 
 
-Extent::Extent(Inode* inode)
+BlockDirectory::BlockDirectory(Inode* inode)
 	:
 	fInode(inode),
 	fOffset(0)
@@ -18,13 +18,13 @@ Extent::Extent(Inode* inode)
 }
 
 
-Extent::~Extent()
+BlockDirectory::~BlockDirectory()
 {
 }
 
 
 void
-Extent::FillMapEntry(void* pointerToMap)
+BlockDirectory::FillMapEntry(void* pointerToMap)
 {
 	uint64 firstHalf = *((uint64*)pointerToMap);
 	uint64 secondHalf = *((uint64*)pointerToMap + 1);
@@ -42,7 +42,7 @@ Extent::FillMapEntry(void* pointerToMap)
 
 
 status_t
-Extent::FillBlockBuffer()
+BlockDirectory::FillBlockBuffer()
 {
 	if (fMap->br_state != 0)
 		return B_BAD_VALUE;
@@ -66,7 +66,7 @@ Extent::FillBlockBuffer()
 
 
 status_t
-Extent::Init()
+BlockDirectory::Init()
 {
 	fMap = new(std::nothrow) ExtentMapEntry;
 	if (fMap == NULL)
@@ -83,10 +83,10 @@ Extent::Init()
 	if (status != B_OK)
 		return status;
 
-	ExtentDataHeader* header = ExtentDataHeader::Create(fInode, fBlockBuffer);
+	DataHeader* header = DataHeader::Create(fInode, fBlockBuffer);
 	if (header == NULL)
 		return B_NO_MEMORY;
-	if (!VerifyHeader<ExtentDataHeader>(header, fBlockBuffer, fInode, 0, fMap, XFS_BLOCK)) {
+	if (!VerifyHeader<DataHeader>(header, fBlockBuffer, fInode, 0, fMap, XFS_BLOCK)) {
 		status = B_BAD_VALUE;
 		ERROR("Extent:Init(): Bad Block!\n");
 	}
@@ -96,16 +96,16 @@ Extent::Init()
 }
 
 
-ExtentBlockTail*
-Extent::BlockTail()
+BlockTail*
+BlockDirectory::GetBlockTail()
 {
-	return (ExtentBlockTail*)
-		(fBlockBuffer + fInode->DirBlockSize() - sizeof(ExtentBlockTail));
+	return (BlockTail*)
+		(fBlockBuffer + fInode->DirBlockSize() - sizeof(BlockTail));
 }
 
 
 uint32
-Extent::GetOffsetFromAddress(uint32 address)
+BlockDirectory::GetOffsetFromAddress(uint32 address)
 {
 	address = address * 8;
 		// block offset in eight bytes, hence multiple with 8
@@ -113,15 +113,15 @@ Extent::GetOffsetFromAddress(uint32 address)
 }
 
 
-ExtentLeafEntry*
-Extent::BlockFirstLeaf(ExtentBlockTail* tail)
+LeafEntry*
+BlockDirectory::BlockFirstLeaf(BlockTail* tail)
 {
-	return (ExtentLeafEntry*)tail - B_BENDIAN_TO_HOST_INT32(tail->count);
+	return (LeafEntry*)tail - B_BENDIAN_TO_HOST_INT32(tail->count);
 }
 
 
 bool
-Extent::IsBlockType()
+BlockDirectory::IsBlockType()
 {
 	bool status = true;
 	if (fInode->BlockCount() != 1)
@@ -137,7 +137,7 @@ Extent::IsBlockType()
 
 
 int
-Extent::EntrySize(int len) const
+BlockDirectory::EntrySize(int len) const
 {
 	int entrySize = sizeof(xfs_ino_t) + sizeof(uint8) + len + sizeof(uint16);
 			// uint16 is for the tag
@@ -150,7 +150,7 @@ Extent::EntrySize(int len) const
 
 
 status_t
-Extent::Rewind()
+BlockDirectory::Rewind()
 {
 	fOffset = 0;
 	return B_OK;
@@ -158,16 +158,16 @@ Extent::Rewind()
 
 
 status_t
-Extent::GetNext(char* name, size_t* length, xfs_ino_t* ino)
+BlockDirectory::GetNext(char* name, size_t* length, xfs_ino_t* ino)
 {
 	TRACE("Extend::GetNext\n");
 
 	void* entry; // This could be unused entry so we should check
 
-	entry = (void*)(fBlockBuffer + ExtentDataHeader::Size(fInode));
+	entry = (void*)(fBlockBuffer + DataHeader::Size(fInode));
 
-	int numberOfEntries = B_BENDIAN_TO_HOST_INT32(BlockTail()->count);
-	int numberOfStaleEntries = B_BENDIAN_TO_HOST_INT32(BlockTail()->stale);
+	int numberOfEntries = B_BENDIAN_TO_HOST_INT32(GetBlockTail()->count);
+	int numberOfStaleEntries = B_BENDIAN_TO_HOST_INT32(GetBlockTail()->stale);
 
 	// We don't read stale entries.
 	numberOfEntries -= numberOfStaleEntries;
@@ -175,7 +175,7 @@ Extent::GetNext(char* name, size_t* length, xfs_ino_t* ino)
 	uint16 currentOffset = (char*)entry - fBlockBuffer;
 
 	for (int i = 0; i < numberOfEntries; i++) {
-		ExtentUnusedEntry* unusedEntry = (ExtentUnusedEntry*)entry;
+		UnusedEntry* unusedEntry = (UnusedEntry*)entry;
 
 		if (B_BENDIAN_TO_HOST_INT16(unusedEntry->freetag) == DIR2_FREE_TAG) {
 			TRACE("Unused entry found\n");
@@ -185,7 +185,7 @@ Extent::GetNext(char* name, size_t* length, xfs_ino_t* ino)
 			i--;
 			continue;
 		}
-		ExtentDataEntry* dataEntry = (ExtentDataEntry*) entry;
+		DataEntry* dataEntry = (DataEntry*) entry;
 
 		if (fOffset >= currentOffset) {
 			entry = (void*)((char*)entry + EntrySize(dataEntry->namelen));
@@ -212,20 +212,20 @@ Extent::GetNext(char* name, size_t* length, xfs_ino_t* ino)
 
 
 status_t
-Extent::Lookup(const char* name, size_t length, xfs_ino_t* ino)
+BlockDirectory::Lookup(const char* name, size_t length, xfs_ino_t* ino)
 {
 	TRACE("Extent: Lookup\n");
 	TRACE("Name: %s\n", name);
 	uint32 hashValueOfRequest = hashfunction(name, length);
 	TRACE("Hashval:(%" B_PRIu32 ")\n", hashValueOfRequest);
-	ExtentBlockTail* blockTail = BlockTail();
-	ExtentLeafEntry* leafEntry = BlockFirstLeaf(blockTail);
+	BlockTail* blockTail = GetBlockTail();
+	LeafEntry* leafEntry = BlockFirstLeaf(blockTail);
 
 	int numberOfLeafEntries = B_BENDIAN_TO_HOST_INT32(blockTail->count);
 	int left = 0;
 	int right = numberOfLeafEntries - 1;
 
-	hashLowerBound<ExtentLeafEntry>(leafEntry, left, right, hashValueOfRequest);
+	hashLowerBound<LeafEntry>(leafEntry, left, right, hashValueOfRequest);
 
 	while (B_BENDIAN_TO_HOST_INT32(leafEntry[left].hashval)
 			== hashValueOfRequest) {
@@ -238,7 +238,7 @@ Extent::Lookup(const char* name, size_t length, xfs_ino_t* ino)
 
 		uint32 offset = GetOffsetFromAddress(address);
 		TRACE("offset:(%" B_PRIu32 ")\n", offset);
-		ExtentDataEntry* entry = (ExtentDataEntry*)(fBlockBuffer + offset);
+		DataEntry* entry = (DataEntry*)(fBlockBuffer + offset);
 
 		if (xfs_da_name_comp(name, length, entry->name, entry->namelen)) {
 			*ino = B_BENDIAN_TO_HOST_INT64(entry->inumber);
@@ -252,7 +252,7 @@ Extent::Lookup(const char* name, size_t length, xfs_ino_t* ino)
 }
 
 
-ExtentDataHeader::~ExtentDataHeader()
+DataHeader::~DataHeader()
 {
 }
 
@@ -262,7 +262,7 @@ ExtentDataHeader::~ExtentDataHeader()
 	return magic number as per Inode Version.
 */
 uint32
-ExtentDataHeader::ExpectedMagic(int8 WhichDirectory, Inode* inode)
+DataHeader::ExpectedMagic(int8 WhichDirectory, Inode* inode)
 {
 	if (WhichDirectory == XFS_BLOCK) {
 		if (inode->Version() == 1 || inode->Version() == 2)
@@ -279,20 +279,20 @@ ExtentDataHeader::ExpectedMagic(int8 WhichDirectory, Inode* inode)
 
 
 uint32
-ExtentDataHeader::CRCOffset()
+DataHeader::CRCOffset()
 {
-	return offsetof(ExtentDataHeaderV5::OnDiskData, crc);
+	return offsetof(DataHeaderV5::OnDiskData, crc);
 }
 
 
-ExtentDataHeader*
-ExtentDataHeader::Create(Inode* inode, const char* buffer)
+DataHeader*
+DataHeader::Create(Inode* inode, const char* buffer)
 {
 	if (inode->Version() == 1 || inode->Version() == 2) {
-		ExtentDataHeaderV4* header = new (std::nothrow) ExtentDataHeaderV4(buffer);
+		DataHeaderV4* header = new (std::nothrow) DataHeaderV4(buffer);
 		return header;
 	} else {
-		ExtentDataHeaderV5* header = new (std::nothrow) ExtentDataHeaderV5(buffer);
+		DataHeaderV5* header = new (std::nothrow) DataHeaderV5(buffer);
 		return header;
 	}
 }
@@ -305,64 +305,64 @@ ExtentDataHeader::Create(Inode* inode, const char* buffer)
 	vtable as well and it will give wrong results
 */
 uint32
-ExtentDataHeader::Size(Inode* inode)
+DataHeader::Size(Inode* inode)
 {
 	if (inode->Version() == 1 || inode->Version() == 2)
-		return sizeof(ExtentDataHeaderV4::OnDiskData);
+		return sizeof(DataHeaderV4::OnDiskData);
 	else
-		return sizeof(ExtentDataHeaderV5::OnDiskData);
+		return sizeof(DataHeaderV5::OnDiskData);
 }
 
 
 void
-ExtentDataHeaderV4::_SwapEndian()
+DataHeaderV4::_SwapEndian()
 {
 	fData.magic = (B_BENDIAN_TO_HOST_INT32(fData.magic));
 }
 
 
-ExtentDataHeaderV4::ExtentDataHeaderV4(const char* buffer)
+DataHeaderV4::DataHeaderV4(const char* buffer)
 {
 	memcpy(&fData, buffer, sizeof(fData));
 	_SwapEndian();
 }
 
 
-ExtentDataHeaderV4::~ExtentDataHeaderV4()
+DataHeaderV4::~DataHeaderV4()
 {
 }
 
 
 uint32
-ExtentDataHeaderV4::Magic()
+DataHeaderV4::Magic()
 {
 	return fData.magic;
 }
 
 
 uint64
-ExtentDataHeaderV4::Blockno()
+DataHeaderV4::Blockno()
 {
 	return B_BAD_VALUE;
 }
 
 
 uint64
-ExtentDataHeaderV4::Lsn()
+DataHeaderV4::Lsn()
 {
 	return B_BAD_VALUE;
 }
 
 
 uint64
-ExtentDataHeaderV4::Owner()
+DataHeaderV4::Owner()
 {
 	return B_BAD_VALUE;
 }
 
 
 const uuid_t&
-ExtentDataHeaderV4::Uuid()
+DataHeaderV4::Uuid()
 {
 	static uuid_t nullUuid;
 	return nullUuid;
@@ -370,7 +370,7 @@ ExtentDataHeaderV4::Uuid()
 
 
 void
-ExtentDataHeaderV5::_SwapEndian()
+DataHeaderV5::_SwapEndian()
 {
 	fData.magic	=	B_BENDIAN_TO_HOST_INT32(fData.magic);
 	fData.blkno	=	B_BENDIAN_TO_HOST_INT64(fData.blkno);
@@ -380,48 +380,48 @@ ExtentDataHeaderV5::_SwapEndian()
 }
 
 
-ExtentDataHeaderV5::ExtentDataHeaderV5(const char* buffer)
+DataHeaderV5::DataHeaderV5(const char* buffer)
 {
 	memcpy(&fData, buffer, sizeof(fData));
 	_SwapEndian();
 }
 
 
-ExtentDataHeaderV5::~ExtentDataHeaderV5()
+DataHeaderV5::~DataHeaderV5()
 {
 }
 
 
 uint32
-ExtentDataHeaderV5::Magic()
+DataHeaderV5::Magic()
 {
 	return fData.magic;
 }
 
 
 uint64
-ExtentDataHeaderV5::Blockno()
+DataHeaderV5::Blockno()
 {
 	return fData.blkno;
 }
 
 
 uint64
-ExtentDataHeaderV5::Lsn()
+DataHeaderV5::Lsn()
 {
 	return fData.lsn;
 }
 
 
 uint64
-ExtentDataHeaderV5::Owner()
+DataHeaderV5::Owner()
 {
 	return fData.owner;
 }
 
 
 const uuid_t&
-ExtentDataHeaderV5::Uuid()
+DataHeaderV5::Uuid()
 {
 	return fData.uuid;
 }
