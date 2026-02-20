@@ -179,8 +179,10 @@ get_word(char **_pos, char **_word, int32 assignmentMode, bool allowNewLine)
 			|| (!allowNewLine && (pos[0] == '\t' || pos[0] == ' '))
 			|| (assignmentMode == ALLOW_ASSIGNMENT && pos[0] == '='))) {
 		// skip any comment lines
-		if (pos[0] == '#')
-			pos = strchrnul(pos, '\n');
+		if (pos[0] == '#') {
+			while (pos[0] && pos[0] != '\n')
+				pos++;
+		}
 		pos++;
 	}
 

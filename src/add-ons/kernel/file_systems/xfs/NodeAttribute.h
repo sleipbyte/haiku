@@ -7,7 +7,7 @@
 
 
 #include "LeafAttribute.h"
-#include "Node.h"
+#include "NodeDirectory.h"
 
 
 class NodeAttribute : public Attribute {

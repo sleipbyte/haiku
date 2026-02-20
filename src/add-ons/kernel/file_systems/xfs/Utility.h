@@ -5,7 +5,6 @@
 #ifndef UTILITY_H
 #define UTILITY_H
 
-<<<<<<< HEAD
 
 // returns true if name1 and name2 matches
 inline bool
@@ -55,18 +54,17 @@ hashfunction(const char* name, int length)
 }
 
 
-// A common function to return given hash lowerbound using binary search.
-template<class T>
-void
+// A common function to return given hash lowerbound
+template<class T> void
 hashLowerBound(T* entry, int& left, int& right, uint32 hashValueOfRequest)
 {
 	int mid;
 
 	/*
-	 * Trying to find the lowerbound of hashValueOfRequest
-	 * This is slightly different from bsearch(), as we want the first
-	 * instance of hashValueOfRequest and not any instance.
-	 */
+	* Trying to find the lowerbound of hashValueOfRequest
+	* This is slightly different from bsearch(), as we want the first
+	* instance of hashValueOfRequest and not any instance.
+	*/
 	while (left < right) {
 		mid = (left + right) / 2;
 		uint32 hashval = B_BENDIAN_TO_HOST_INT32(entry[mid].hashval);
@@ -75,16 +73,9 @@ hashLowerBound(T* entry, int& left, int& right, uint32 hashValueOfRequest)
 			continue;
 		}
 		if (hashval < hashValueOfRequest)
-			left = mid + 1;
+			left = mid+1;
 	}
 	TRACE("left:(%" B_PRId32 "), right:(%" B_PRId32 ")\n", left, right);
-=======
-// returns true if name1 and name2 matches
-static inline bool 
-xfs_da_name_comp(const char* name1, size_t length1, const unsigned char* name2, size_t length2)
-{
-    return length1 == length2 && memcmp(name1, name2, length1) == 0;
->>>>>>> c40a6c696b (Alternate implementation of d9d7262936)
 }
 
 #endif // UTILITY_H
