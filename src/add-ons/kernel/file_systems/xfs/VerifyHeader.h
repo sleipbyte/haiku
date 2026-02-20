@@ -8,10 +8,10 @@
 
 #include "BPlusTree.h"
 #include "Checksum.h"
-#include "Extent.h"
+#include "BlockDirectory.h"
 #include "Inode.h"
 #include "LeafDirectory.h"
-#include "Node.h"
+#include "NodeDirectory.h"
 #include "xfs_types.h"
 #include "system_dependencies.h"
 

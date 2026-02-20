@@ -24,7 +24,7 @@ typedef int64 xfs_daddr_t;		// device address
 typedef uint32 xfs_agnumber_t;	// Allocation Group (AG) number
 typedef uint32 xfs_agblock_t;	// AG relative block number
 typedef uint32 xfs_extlen_t;	// extent length in blocks
-typedef int32 xfs_extnum_t;		// number of extends in a file
+typedef int32 xfs_extnum_t;		// number of extents in a file
 typedef int16 xfs_aextnum_t;	// number of extents in an attribute fork
 typedef uint32	xfs_dablk_t;	// block number for directories
 								// and extended attributes

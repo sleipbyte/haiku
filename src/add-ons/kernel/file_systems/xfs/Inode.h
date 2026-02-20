@@ -427,5 +427,4 @@ private:
 			ExtentMapEntry*		fExtents;
 };
 
-
 #endif
