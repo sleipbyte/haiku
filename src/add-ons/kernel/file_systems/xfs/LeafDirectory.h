@@ -8,7 +8,7 @@
 
 
 #include "Directory.h"
-#include "Extent.h"
+#include "BlockDirectory.h"
 #include "Inode.h"
 #include "system_dependencies.h"
 #include "Utility.h"
@@ -25,10 +25,10 @@ enum ContentType { DATA, LEAF };
 
 
 // This class will act as interface for V4 and V5 leaf header
-class ExtentLeafHeader {
+class LeafHeader {
 public:
 
-			virtual						~ExtentLeafHeader()		=	0;
+			virtual						~LeafHeader()			=	0;
 			virtual	uint16				Magic()					=	0;
 			virtual	uint64				Blockno()				=	0;
 			virtual	uint64				Lsn()					=	0;
@@ -39,14 +39,14 @@ public:
 			static	uint32				ExpectedMagic(int8 WhichDirectory,
 										Inode* inode);
 			static	uint32				CRCOffset();
-			static	ExtentLeafHeader*	Create(Inode* inode, const char* buffer);
+			static	LeafHeader*			Create(Inode* inode, const char* buffer);
 			static	uint32				Size(Inode* inode);
 
 };
 
 
 //xfs_dir_leaf_hdr_t
-class ExtentLeafHeaderV4 : public ExtentLeafHeader {
+class LeafHeaderV4 : public LeafHeader {
 public:
 			struct OnDiskData {
 			public:
@@ -55,8 +55,8 @@ public:
 				uint16				stale;
 			};
 
-								ExtentLeafHeaderV4(const char* buffer);
-								~ExtentLeafHeaderV4();
+								LeafHeaderV4(const char* buffer);
+								~LeafHeaderV4();
 			void				SwapEndian();
 			uint16				Magic();
 			uint64				Blockno();
@@ -72,7 +72,7 @@ private:
 
 
 // xfs_dir3_leaf_hdr_t
-class ExtentLeafHeaderV5 : public ExtentLeafHeader {
+class LeafHeaderV5 : public LeafHeader {
 public:
 			struct OnDiskData {
 				BlockInfoV5			info;
@@ -81,8 +81,8 @@ public:
 				uint32				pad;
 			};
 
-								ExtentLeafHeaderV5(const char* buffer);
-								~ExtentLeafHeaderV5();
+								LeafHeaderV5(const char* buffer);
+								~LeafHeaderV5();
 			void				SwapEndian();
 			uint16				Magic();
 			uint64				Blockno();
@@ -99,7 +99,7 @@ private:
 
 
 // xfs_dir2_leaf_tail_t
-struct ExtentLeafTail {
+struct LeafTail {
 			uint32				bestcount;
 				// # of best free entries
 };
@@ -115,7 +115,7 @@ public:
 			status_t			FillBuffer(int type, char* buffer,
 									int howManyBlocksFurthur);
 			void				SearchAndFillDataMap(uint64 blockNo);
-			ExtentLeafEntry*	FirstLeaf();
+			LeafEntry*			FirstLeaf();
 			xfs_ino_t			GetIno();
 			uint32				GetOffsetFromAddress(uint32 address);
 			int					EntrySize(int len) const;

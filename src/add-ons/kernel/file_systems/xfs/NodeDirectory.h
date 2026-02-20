@@ -2,12 +2,12 @@
  * Copyright 2020, Shubham Bhagat, shubhambhagat111@yahoo.com
  * All rights reserved. Distributed under the terms of the MIT License.
  */
-#ifndef _NODE_H_
-#define _NODE_H_
+#ifndef _NODE_DIRECTORY_H_
+#define _NODE_DIRECTORY_H_
 
 
 #include "Directory.h"
-#include "Extent.h"
+#include "BlockDirectory.h"
 #include "LeafDirectory.h"
 #include "Utility.h"
 

@@ -6,9 +6,9 @@
 
 #include "BPlusTree.h"
 #include "Directory.h"
-#include "Extent.h"
+#include "BlockDirectory.h"
 #include "LeafDirectory.h"
-#include "Node.h"
+#include "NodeDirectory.h"
 #include "ShortDirectory.h"
 
 
@@ -31,17 +31,17 @@ DirectoryIterator::Init(Inode* inode)
 		status_t status;
 
 		// Check if it is extent based directory
-		Extent* extentDir = new(std::nothrow) Extent(inode);
-		if (extentDir == NULL)
+		BlockDirectory* blockDir = new(std::nothrow) BlockDirectory(inode);
+		if (blockDir == NULL)
 			return NULL;
 
-		if (extentDir->IsBlockType()) {
-			status = extentDir->Init();
+		if (blockDir->IsBlockType()) {
+			status = blockDir->Init();
 			if (status == B_OK)
-				return extentDir;
+				return blockDir;
 		}
 
-		delete extentDir;
+		delete blockDir;
 
 		// Check if it is leaf based directory
 		LeafDirectory* leafDir = new(std::nothrow) LeafDirectory(inode);

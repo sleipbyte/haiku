@@ -50,10 +50,10 @@ LeafDirectory::Init()
 	status_t status = FillBuffer(DATA, fDataBuffer, 0);
 	if (status != B_OK)
 		return status;
-	ExtentDataHeader* data = ExtentDataHeader::Create(fInode, fDataBuffer);
+	DataHeader* data = DataHeader::Create(fInode, fDataBuffer);
 	if (data == NULL)
 		return B_NO_MEMORY;
-	if (!VerifyHeader<ExtentDataHeader>(data, fDataBuffer, fInode, 0, fDataMap, XFS_LEAF)) {
+	if (!VerifyHeader<DataHeader>(data, fDataBuffer, fInode, 0, fDataMap, XFS_LEAF)) {
 		ERROR("Invalid data header");
 		delete data;
 		return B_BAD_VALUE;
@@ -64,10 +64,10 @@ LeafDirectory::Init()
 	status = FillBuffer(LEAF, fLeafBuffer, 0);
 	if (status != B_OK)
 		return status;
-	ExtentLeafHeader* leaf = ExtentLeafHeader::Create(fInode, fLeafBuffer);
+	LeafHeader* leaf = LeafHeader::Create(fInode, fLeafBuffer);
 	if (leaf == NULL)
 		return B_NO_MEMORY;
-	if (!VerifyHeader<ExtentLeafHeader>(leaf, fLeafBuffer, fInode, 0, fLeafMap, XFS_LEAF)) {
+	if (!VerifyHeader<LeafHeader>(leaf, fLeafBuffer, fInode, 0, fLeafMap, XFS_LEAF)) {
 		ERROR("Invalid leaf header");
 		delete leaf;
 		return B_BAD_VALUE;
@@ -162,7 +162,7 @@ LeafDirectory::FillBuffer(int type, char* blockBuffer, int howManyBlocksFurthur)
 		fDataBuffer = blockBuffer;
 	} else if (type == LEAF) {
 		fLeafBuffer = blockBuffer;
-		ExtentLeafHeader* header = ExtentLeafHeader::Create(fInode, fLeafBuffer);
+		LeafHeader* header = LeafHeader::Create(fInode, fLeafBuffer);
 		if (header == NULL)
 			return B_NO_MEMORY;
 		TRACE("NumberOfEntries in leaf: (%" B_PRIu16 ")\n", header->Count());
@@ -181,7 +181,7 @@ LeafDirectory::GetOffsetFromAddress(uint32 address)
 }
 
 
-ExtentLeafEntry*
+LeafEntry*
 LeafDirectory::FirstLeaf()
 {
 	TRACE("LeafDirectory: FirstLeaf\n");
@@ -191,7 +191,7 @@ LeafDirectory::FirstLeaf()
 		if (status != B_OK)
 			return NULL;
 	}
-	return (ExtentLeafEntry*)((char*)fLeafBuffer + ExtentLeafHeader::Size(fInode));
+	return (LeafEntry*)((char*)fLeafBuffer + LeafHeader::Size(fInode));
 }
 
 
@@ -248,7 +248,7 @@ LeafDirectory::GetNext(char* name, size_t* length, xfs_ino_t* ino)
 
 	void* entry; // This could be unused entry so we should check
 
-	entry = (void*)(fDataBuffer + ExtentDataHeader::Size(fInode));
+	entry = (void*)(fDataBuffer + DataHeader::Size(fInode));
 
 	uint32 blockNoFromAddress = BLOCKNO_FROM_ADDRESS(fOffset, volume);
 	if (fOffset != 0 && blockNoFromAddress == fCurBlockNumber)
@@ -273,8 +273,8 @@ LeafDirectory::GetNext(char* name, size_t* length, xfs_ino_t* ino)
 				blockNoFromAddress - fDataMap->br_startoff);
 			if (status != B_OK)
 				return status;
-			entry = (void*)(fDataBuffer + ExtentDataHeader::Size(fInode));
-			fOffset = fOffset + ExtentDataHeader::Size(fInode);
+			entry = (void*)(fDataBuffer + DataHeader::Size(fInode));
+			fOffset = fOffset + DataHeader::Size(fInode);
 			fCurBlockNumber = blockNoFromAddress;
 		} else if (fCurBlockNumber != blockNoFromAddress) {
 			// When the block isn't mapped in the current data map entry
@@ -283,12 +283,12 @@ LeafDirectory::GetNext(char* name, size_t* length, xfs_ino_t* ino)
 				blockNoFromAddress - fDataMap->br_startoff);
 			if (status != B_OK)
 				return status;
-			entry = (void*)(fDataBuffer + ExtentDataHeader::Size(fInode));
-			fOffset = fOffset + ExtentDataHeader::Size(fInode);
+			entry = (void*)(fDataBuffer + DataHeader::Size(fInode));
+			fOffset = fOffset + DataHeader::Size(fInode);
 			fCurBlockNumber = blockNoFromAddress;
 		}
 
-		ExtentUnusedEntry* unusedEntry = (ExtentUnusedEntry*)entry;
+		UnusedEntry* unusedEntry = (UnusedEntry*)entry;
 
 		if (B_BENDIAN_TO_HOST_INT16(unusedEntry->freetag) == DIR2_FREE_TAG) {
 			TRACE("Unused entry found\n");
@@ -297,7 +297,7 @@ LeafDirectory::GetNext(char* name, size_t* length, xfs_ino_t* ino)
 				((char*)entry + B_BENDIAN_TO_HOST_INT16(unusedEntry->length));
 			continue;
 		}
-		ExtentDataEntry* dataEntry = (ExtentDataEntry*) entry;
+		DataEntry* dataEntry = (DataEntry*) entry;
 
 		uint16 currentOffset = (char*)dataEntry - fDataBuffer;
 		TRACE("GetNext: fOffset:(%" B_PRIu32 "), currentOffset:(%" B_PRIu16 ")\n",
@@ -340,11 +340,11 @@ LeafDirectory::Lookup(const char* name, size_t length, xfs_ino_t* ino)
 	if (status != B_OK)
 		return status;
 
-	ExtentLeafHeader* leafHeader = ExtentLeafHeader::Create(fInode, fLeafBuffer);
+	LeafHeader* leafHeader = LeafHeader::Create(fInode, fLeafBuffer);
 	if (leafHeader == NULL)
 		return B_NO_MEMORY;
 
-	ExtentLeafEntry* leafEntry = FirstLeaf();
+	LeafEntry* leafEntry = FirstLeaf();
 	if (leafEntry == NULL)
 		return B_NO_MEMORY;
 
@@ -354,7 +354,7 @@ LeafDirectory::Lookup(const char* name, size_t length, xfs_ino_t* ino)
 	int right = numberOfLeafEntries - 1;
 	Volume* volume = fInode->GetVolume();
 
-	hashLowerBound<ExtentLeafEntry>(leafEntry, left, right, hashValueOfRequest);
+	hashLowerBound<LeafEntry>(leafEntry, left, right, hashValueOfRequest);
 
 	while (B_BENDIAN_TO_HOST_INT32(leafEntry[left].hashval)
 			== hashValueOfRequest) {
@@ -379,7 +379,7 @@ LeafDirectory::Lookup(const char* name, size_t length, xfs_ino_t* ino)
 		}
 
 		TRACE("offset:(%" B_PRIu32 ")\n", offset);
-		ExtentDataEntry* entry = (ExtentDataEntry*)(fDataBuffer + offset);
+		DataEntry* entry = (DataEntry*)(fDataBuffer + offset);
 
 		if (xfs_da_name_comp(name, length, entry->name, entry->namelen)) {
 			*ino = B_BENDIAN_TO_HOST_INT64(entry->inumber);
@@ -395,7 +395,7 @@ LeafDirectory::Lookup(const char* name, size_t length, xfs_ino_t* ino)
 }
 
 
-ExtentLeafHeader::~ExtentLeafHeader()
+LeafHeader::~LeafHeader()
 {
 }
 
@@ -405,7 +405,7 @@ ExtentLeafHeader::~ExtentLeafHeader()
 	return magic number as per Inode Version.
 */
 uint32
-ExtentLeafHeader::ExpectedMagic(int8 WhichDirectory, Inode* inode)
+LeafHeader::ExpectedMagic(int8 WhichDirectory, Inode* inode)
 {
 	if (WhichDirectory == XFS_LEAF) {
 		if (inode->Version() == 1 || inode->Version() == 2)
@@ -422,20 +422,20 @@ ExtentLeafHeader::ExpectedMagic(int8 WhichDirectory, Inode* inode)
 
 
 uint32
-ExtentLeafHeader::CRCOffset()
+LeafHeader::CRCOffset()
 {
-	return offsetof(ExtentLeafHeaderV5::OnDiskData, info.crc);
+	return offsetof(LeafHeaderV5::OnDiskData, info.crc);
 }
 
 
-ExtentLeafHeader*
-ExtentLeafHeader::Create(Inode* inode, const char* buffer)
+LeafHeader*
+LeafHeader::Create(Inode* inode, const char* buffer)
 {
 	if (inode->Version() == 1 || inode->Version() == 2) {
-		ExtentLeafHeaderV4* header = new (std::nothrow) ExtentLeafHeaderV4(buffer);
+		LeafHeaderV4* header = new (std::nothrow) LeafHeaderV4(buffer);
 		return header;
 	} else {
-		ExtentLeafHeaderV5* header = new (std::nothrow) ExtentLeafHeaderV5(buffer);
+		LeafHeaderV5* header = new (std::nothrow) LeafHeaderV5(buffer);
 		return header;
 	}
 }
@@ -448,69 +448,69 @@ ExtentLeafHeader::Create(Inode* inode, const char* buffer)
 	vtable as well and it will give wrong results
 */
 uint32
-ExtentLeafHeader::Size(Inode* inode)
+LeafHeader::Size(Inode* inode)
 {
 	if (inode->Version() == 1 || inode->Version() == 2)
-		return sizeof(ExtentLeafHeaderV4::OnDiskData);
+		return sizeof(LeafHeaderV4::OnDiskData);
 	else
-		return sizeof(ExtentLeafHeaderV5::OnDiskData);
+		return sizeof(LeafHeaderV5::OnDiskData);
 }
 
 
 void
-ExtentLeafHeaderV4::SwapEndian()
+LeafHeaderV4::SwapEndian()
 {
-	fData.info.forw	=	B_BENDIAN_TO_HOST_INT32(fData.info.forw);
-	fData.info.back	=	B_BENDIAN_TO_HOST_INT32(fData.info.back);
+	fData.info.forw		=	B_BENDIAN_TO_HOST_INT32(fData.info.forw);
+	fData.info.back		=	B_BENDIAN_TO_HOST_INT32(fData.info.back);
 	fData.info.magic	= 	B_BENDIAN_TO_HOST_INT16(fData.info.magic);
-	fData.info.pad	=	B_BENDIAN_TO_HOST_INT16(fData.info.pad);
-	fData.count		=	B_BENDIAN_TO_HOST_INT16(fData.count);
-	fData.stale		=	B_BENDIAN_TO_HOST_INT16(fData.stale);
+	fData.info.pad		=	B_BENDIAN_TO_HOST_INT16(fData.info.pad);
+	fData.count			=	B_BENDIAN_TO_HOST_INT16(fData.count);
+	fData.stale			=	B_BENDIAN_TO_HOST_INT16(fData.stale);
 }
 
 
-ExtentLeafHeaderV4::ExtentLeafHeaderV4(const char* buffer)
+LeafHeaderV4::LeafHeaderV4(const char* buffer)
 {
 	memcpy(&fData, buffer, sizeof(fData));
 	SwapEndian();
 }
 
 
-ExtentLeafHeaderV4::~ExtentLeafHeaderV4()
+LeafHeaderV4::~LeafHeaderV4()
 {
 }
 
 
 uint16
-ExtentLeafHeaderV4::Magic()
+LeafHeaderV4::Magic()
 {
 	return fData.info.magic;
 }
 
 
 uint64
-ExtentLeafHeaderV4::Blockno()
+LeafHeaderV4::Blockno()
 {
 	return B_BAD_VALUE;
 }
 
 
 uint64
-ExtentLeafHeaderV4::Lsn()
+LeafHeaderV4::Lsn()
 {
 	return B_BAD_VALUE;
 }
 
 
 uint64
-ExtentLeafHeaderV4::Owner()
+LeafHeaderV4::Owner()
 {
 	return B_BAD_VALUE;
 }
 
 
 const uuid_t&
-ExtentLeafHeaderV4::Uuid()
+LeafHeaderV4::Uuid()
 {
 	static uuid_t nullUuid = {0};
 	return nullUuid;
@@ -518,21 +518,21 @@ ExtentLeafHeaderV4::Uuid()
 
 
 uint16
-ExtentLeafHeaderV4::Count()
+LeafHeaderV4::Count()
 {
 	return fData.count;
 }
 
 
 uint32
-ExtentLeafHeaderV4::Forw()
+LeafHeaderV4::Forw()
 {
 	return fData.info.forw;
 }
 
 
 void
-ExtentLeafHeaderV5::SwapEndian()
+LeafHeaderV5::SwapEndian()
 {
 	fData.info.forw		=	B_BENDIAN_TO_HOST_INT32(fData.info.forw);
 	fData.info.back		=	B_BENDIAN_TO_HOST_INT32(fData.info.back);
@@ -547,62 +547,62 @@ ExtentLeafHeaderV5::SwapEndian()
 }
 
 
-ExtentLeafHeaderV5::ExtentLeafHeaderV5(const char* buffer)
+LeafHeaderV5::LeafHeaderV5(const char* buffer)
 {
 	memcpy(&fData, buffer, sizeof(fData));
 	SwapEndian();
 }
 
 
-ExtentLeafHeaderV5::~ExtentLeafHeaderV5()
+LeafHeaderV5::~LeafHeaderV5()
 {
 }
 
 
 uint16
-ExtentLeafHeaderV5::Magic()
+LeafHeaderV5::Magic()
 {
 	return fData.info.magic;
 }
 
 
 uint64
-ExtentLeafHeaderV5::Blockno()
+LeafHeaderV5::Blockno()
 {
 	return fData.info.blkno;
 }
 
 
 uint64
-ExtentLeafHeaderV5::Lsn()
+LeafHeaderV5::Lsn()
 {
 	return fData.info.lsn;
 }
 
 
 uint64
-ExtentLeafHeaderV5::Owner()
+LeafHeaderV5::Owner()
 {
 	return fData.info.owner;
 }
 
 
 const uuid_t&
-ExtentLeafHeaderV5::Uuid()
+LeafHeaderV5::Uuid()
 {
 	return fData.info.uuid;
 }
 
 
 uint16
-ExtentLeafHeaderV5::Count()
+LeafHeaderV5::Count()
 {
 	return fData.count;
 }
 
 
 uint32
-ExtentLeafHeaderV5::Forw()
+LeafHeaderV5::Forw()
 {
 	return fData.info.forw;
 }
