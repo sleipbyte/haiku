@@ -12,26 +12,15 @@
  */
 
 
-#include <dirent.h>
-#include <unistd.h>
-#include <util/kernel_cpp.h>
-#include <string.h>
 
-#include <new>
-
-#include <AutoDeleter.h>
-#include <fs_cache.h>
-#include <fs_info.h>
-#include <io_requests.h>
-#include <NodeMonitor.h>
 #include <StorageDefs.h>
-#include <util/AutoLock.h>
 #include <file_systems/fs_ops_support.h>
 
 #include "DirectoryIterator.h"
 #include "exfat.h"
 #include "Inode.h"
 #include "Utility.h"
+
 
 
 //#define TRACE_EXFAT

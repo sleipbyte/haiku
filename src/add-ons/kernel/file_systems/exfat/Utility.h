@@ -11,8 +11,8 @@
 #ifndef UTILITY_H
 #define UTILITY_H
 
-
 #include "exfat.h"
+#include "system_dependencies.h"
 
 
 enum inode_type {

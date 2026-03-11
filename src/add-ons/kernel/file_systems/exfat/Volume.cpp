@@ -15,25 +15,16 @@
 //! Superblock, mounting, etc.
 
 
-#include "Volume.h"
 
-#include <errno.h>
-#include <unistd.h>
-#include <new>
-#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
-#include <fs_cache.h>
-#include <fs_volume.h>
-
-#include <util/AutoLock.h>
 
 #include "CachedBlock.h"
 #include "DeviceOpener.h"
 #include "Inode.h"
 #include "Utility.h"
-
+#include "Volume.h"
+#include "system_dependencies.h"
 
 //#define TRACE_EXFAT
 #ifdef TRACE_EXFAT

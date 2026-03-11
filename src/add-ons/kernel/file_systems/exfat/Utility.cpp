@@ -10,15 +10,11 @@
  */
 
 
+
+#include <stdlib.h>
+
 #include "Utility.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#include <Errors.h>
-
-#include <util/convertutf.h>
 
 
 status_t
