@@ -14,9 +14,6 @@
 #define VOLUME_H
 
 
-#include <StorageDefs.h>
-#include <util/SplayTree.h>
-
 #include "exfat.h"
 #include "system_dependencies.h"
 

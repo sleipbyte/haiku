@@ -114,7 +114,7 @@ init_kernel()
 			fssh_strerror(error));
 		return error;
 	}
-
+	
 	return FSSH_B_OK;
 }
 

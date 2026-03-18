@@ -15,10 +15,6 @@
 //! Superblock, mounting, etc.
 
 
-
-#include <stdlib.h>
-
-
 #include "CachedBlock.h"
 #include "DeviceOpener.h"
 #include "Inode.h"

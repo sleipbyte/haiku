@@ -12,6 +12,7 @@
 
 #include <new>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "fd.h"
@@ -4658,7 +4659,7 @@ fs_mount(char *path, const char *device, const char *fsName, uint32_t flags,
 
 	mount->device_name = fssh_strdup(device);
 		// "device" can be NULL
-
+	
 	mount->fs = get_file_system(fsName);
 	if (mount->fs == NULL) {
 		status = FSSH_ENODEV;

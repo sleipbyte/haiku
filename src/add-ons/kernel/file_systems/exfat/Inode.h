@@ -7,9 +7,6 @@
 #define INODE_H
 
 
-
-#include <util/SplayTree.h>
-
 #include "DirectoryIterator.h"
 #include "exfat.h"
 #include "Volume.h"

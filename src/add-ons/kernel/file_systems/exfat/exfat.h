@@ -14,8 +14,6 @@
 #include "system_dependencies.h"
 
 
-
-
 typedef uint64 fileblock_t;		// file block number
 typedef uint64 fsblock_t;		// filesystem block number
 

@@ -13,15 +13,12 @@
 
 
 
-#include <StorageDefs.h>
-#include <file_systems/fs_ops_support.h>
-
 #include "DirectoryIterator.h"
 #include "exfat.h"
 #include "Inode.h"
 #include "Utility.h"
 
-
+#include <file_systems/fs_ops_support.h>
 
 //#define TRACE_EXFAT
 #ifdef TRACE_EXFAT
@@ -147,6 +144,7 @@ static status_t
 exfat_mount(fs_volume* _volume, const char* device, uint32 flags,
 	const char* args, ino_t* _rootID)
 {
+	TRACE("exfat_mount(): Trying to mount\n");
 	Volume* volume = new(std::nothrow) Volume(_volume);
 	if (volume == NULL)
 		return B_NO_MEMORY;
@@ -301,7 +299,7 @@ exfat_io(fs_volume* _volume, fs_vnode* _node, void* _cookie,
 	Volume* volume = (Volume*)_volume->private_volume;
 	Inode* inode = (Inode*)_node->private_node;
 
-#ifndef EXFAT_SHELL
+#ifndef FS_SHELL
 	if (io_request_is_write(request) && volume->IsReadOnly()) {
 		notify_io_request(request, B_READ_ONLY_DEVICE);
 		return B_READ_ONLY_DEVICE;
@@ -309,7 +307,7 @@ exfat_io(fs_volume* _volume, fs_vnode* _node, void* _cookie,
 #endif
 
 	if (inode->FileCache() == NULL) {
-#ifndef EXFAT_SHELL
+#ifndef FS_SHELL
 		notify_io_request(request, B_BAD_VALUE);
 #endif
 		return B_BAD_VALUE;

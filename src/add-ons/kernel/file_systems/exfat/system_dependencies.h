@@ -7,39 +7,44 @@
 
 #ifdef FS_SHELL
 // This needs to be included before the fs_shell wrapper
+
 #include "fssh_api_wrapper.h"
 #include "fssh_auto_deleter.h"
-#include <new>
-#include <util/convertutf.h>
-#include <util/kernel_cpp.h>
+#include "fssh_convertutf.h"
+
+#include <util/SplayTree.h>
 
 #else // !FS_SHELL
 
-#include <util/AutoLock.h>
-#include <string.h>
 #include <AutoDeleter.h>
-#include <fs_cache.h>
-#include <sys/stat.h>
-#include <ByteOrder.h>
-#include <fs_interface.h>
-#include <KernelExport.h>
-#include <fs_cache.h>
-#include <lock.h>
 #include <util/AutoLock.h>
-#include <dirent.h>
-#include <unistd.h>
-#include <string.h>
-#include <io_requests.h>
-#include <real_time_clock.h>
-#include <sys/stat.h>
-#include <stdio.h>
-#include <Errors.h>
-#include <errno.h>
-#include <unistd.h>
+#include <util/DoublyLinkedList.h>
+#include <util/SinglyLinkedList.h>
+#include <util/Stack.h>
+#include <util/SplayTree.h>
+#include <util/convertutf.h>
+
+#include <ByteOrder.h>
+#include <uuid.h>
+
+#include <tracing.h>
+#include <driver_settings.h>
+#include <fs_attr.h>
+#include <fs_cache.h>
+#include <fs_index.h>
 #include <fs_info.h>
+#include <fs_interface.h>
+#include <fs_query.h>
 #include <fs_volume.h>
+#include "Debug.h"
+#include <Drivers.h>
+#include <kernel.h>
+#include <KernelExport.h>
 #include <NodeMonitor.h>
-#include <lock.h>
+#include <SupportDefs.h>
+#include <TypeConstants.h>
+#include <sys/stat.h>
+#include <stdlib.h> 
 #endif // !FS_SHELL
 
-#endif // _SYSTEM_DEPENDENCIES_H
+#endif // _SYSTEM_DEPENDENCIES
