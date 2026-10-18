@@ -12,7 +12,7 @@
 
 
 void
-Inode::SwapEndian()
+Inode::_SwapEndian()
 {
 	fNode->di_magic = B_BENDIAN_TO_HOST_INT16(fNode->di_magic);
 	fNode->di_mode = B_BENDIAN_TO_HOST_INT16(fNode->di_mode);
@@ -22,12 +22,6 @@ Inode::SwapEndian()
 	fNode->di_nlink = B_BENDIAN_TO_HOST_INT32(fNode->di_nlink);
 	fNode->di_projid = B_BENDIAN_TO_HOST_INT16(fNode->di_projid);
 	fNode->di_flushiter = B_BENDIAN_TO_HOST_INT16(fNode->di_flushiter);
-	fNode->di_atime.t_sec = B_BENDIAN_TO_HOST_INT32(fNode->di_atime.t_sec);
-	fNode->di_atime.t_nsec = B_BENDIAN_TO_HOST_INT32(fNode->di_atime.t_nsec);
-	fNode->di_mtime.t_sec = B_BENDIAN_TO_HOST_INT32(fNode->di_mtime.t_sec);
-	fNode->di_mtime.t_nsec = B_BENDIAN_TO_HOST_INT32(fNode->di_mtime.t_nsec);
-	fNode->di_ctime.t_sec = B_BENDIAN_TO_HOST_INT32(fNode->di_ctime.t_sec);
-	fNode->di_ctime.t_nsec = B_BENDIAN_TO_HOST_INT32(fNode->di_ctime.t_nsec);
 	fNode->di_size = B_BENDIAN_TO_HOST_INT64(fNode->di_size);
 	fNode->di_nblocks = B_BENDIAN_TO_HOST_INT64(fNode->di_nblocks);
 	fNode->di_extsize = B_BENDIAN_TO_HOST_INT32(fNode->di_extsize);
@@ -42,41 +36,51 @@ Inode::SwapEndian()
 	fNode->di_lsn = B_BENDIAN_TO_HOST_INT64(fNode->di_lsn);
 	fNode->di_flags2 = B_BENDIAN_TO_HOST_INT64(fNode->di_flags2);
 	fNode->di_cowextsize = B_BENDIAN_TO_HOST_INT64(fNode->di_cowextsize);
-	fNode->di_crtime.t_sec = B_BENDIAN_TO_HOST_INT32(fNode->di_crtime.t_sec);
-	fNode->di_crtime.t_nsec = B_BENDIAN_TO_HOST_INT32(fNode->di_crtime.t_nsec);
 	fNode->di_ino = B_BENDIAN_TO_HOST_INT64(fNode->di_ino);
 }
 
 
 void
-Inode::GetModificationTime(struct timespec& stamp) const
+Inode::_DecodeTime(struct timespec& timestamp, xfs_timestamp_t& ts) const
 {
-	stamp.tv_sec = fNode->di_mtime.t_sec;
-	stamp.tv_nsec = fNode->di_mtime.t_nsec;
+	if (_IsBigtimeEnabled()) {
+		ts = B_BENDIAN_TO_HOST_INT64(ts);
+		timestamp.tv_sec = xfs_bigtime_to_unix(ts / NSEC_PER_SEC);
+		timestamp.tv_nsec = ts % NSEC_PER_SEC;
+		return;
+	}
+	xfs_legacy_timestamp* lts;
+	lts = (xfs_legacy_timestamp*)&ts;
+	timestamp.tv_sec = B_BENDIAN_TO_HOST_INT32(lts->t_sec);
+	timestamp.tv_nsec = B_BENDIAN_TO_HOST_INT32(lts->t_nsec);
 }
 
 
 void
-Inode::GetAccessTime(struct timespec& stamp) const
+Inode::GetModificationTime(struct timespec& timestamp) const
 {
-	stamp.tv_sec = fNode->di_atime.t_sec;
-	stamp.tv_nsec = fNode->di_atime.t_nsec;
+	_DecodeTime(timestamp, fNode->di_mtime);
 }
 
 
 void
-Inode::GetChangeTime(struct timespec& stamp) const
+Inode::GetAccessTime(struct timespec& timestamp) const
 {
-	stamp.tv_sec = fNode->di_ctime.t_sec;
-	stamp.tv_nsec = fNode->di_ctime.t_nsec;
+	_DecodeTime(timestamp, fNode->di_atime);
 }
 
 
 void
-Inode::GetCreationTime(struct timespec& stamp) const
+Inode::GetChangeTime(struct timespec& timestamp) const
 {
-	stamp.tv_sec = fNode->di_crtime.t_sec;
-	stamp.tv_nsec = fNode->di_crtime.t_nsec;
+	_DecodeTime(timestamp, fNode->di_ctime);
+}
+
+
+void
+Inode::GetCreationTime(struct timespec& timestamp) const
+{
+	_DecodeTime(timestamp, fNode->di_crtime);
 }
 
 
@@ -278,7 +282,11 @@ Inode::VerifyInode() const
 			return false;
 	}
 
-	// TODO : Add reflink and big-timestamps check using di_flags2
+	// Bigtime can only happen on bigtime filesystems
+	if (_IsBigtimeEnabled() && !fVolume->IsBigtimeEnabled()) {
+		ERROR("Bigtime inodes can only be supported on bigtime enabled filesystem");
+		return false;
+	}
 
 	return true;
 }
@@ -306,7 +314,7 @@ Inode::Init()
 	if (fBuffer == NULL)
 		return B_NO_MEMORY;
 
-	status_t status = GetFromDisk();
+	status_t status = _GetFromDisk();
 	if (status == B_OK) {
 		if (VerifyInode()) {
 			TRACE("Init(): Inode successfully read.\n");
@@ -690,7 +698,7 @@ Inode::ReadAt(off_t pos, uint8* buffer, size_t* length)
 
 
 status_t
-Inode::GetFromDisk()
+Inode::_GetFromDisk()
 {
 	xfs_agnumber_t agNo = INO_TO_AGNO(fId, fVolume);
 		// Get the AG number from the inode
@@ -729,7 +737,7 @@ Inode::GetFromDisk()
 	else
 		memcpy(fNode, fBuffer, INODE_CRC_OFF);
 
-	SwapEndian();
+	_SwapEndian();
 
 	return B_OK;
 }
