@@ -74,7 +74,7 @@ show_attr_contents(BNode& node, const char* attribute, const attr_info& info)
 	ssize_t bytesRead = node.ReadAttr(attribute, info.type, 0, buffer, size);
 	if (bytesRead != size) {
 		fprintf(stderr, "Could only read %" B_PRIdOFF " bytes from attribute!\n",
-			size);
+			bytesRead);
 		return;
 	}
 	buffer[min_c(bytesRead, kLimit - 1)] = '\0';
