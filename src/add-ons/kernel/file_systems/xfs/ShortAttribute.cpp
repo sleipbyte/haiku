@@ -6,6 +6,8 @@
 
 #include "ShortAttribute.h"
 
+#include "Utility.h"
+
 
 ShortAttribute::ShortAttribute(Inode* inode)
 	:
@@ -156,12 +158,9 @@ ShortAttribute::Lookup(const char* name, size_t* nameLength)
 
 	AShortFormEntry* entry = _FirstEntry();
 
-	int status;
-
 	for (int i = 0; i < fHeader->count; i++) {
 		char* PtrToOffset = (char*)entry + 3 * sizeof(uint8);
-		status = strncmp(name, PtrToOffset, *nameLength);
-		if (status == 0) {
+		if (xfs_name_comp(name, *nameLength, PtrToOffset, entry->namelen)) {
 			fEntry = entry;
 			return B_OK;
 		}
