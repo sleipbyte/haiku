@@ -7,6 +7,7 @@
 #define _INODE_H_
 
 
+#include "Extent.h"
 #include "system_dependencies.h"
 #include "Volume.h"
 #include "xfs_types.h"
@@ -31,15 +32,15 @@
 	((volume)->InodeSize() - DINODE_SIZE(volume))
 
 // inode data and attribute fork sizes
-#define DFORK_BOFF(ino)	((int)((ino)->di_forkoff << 3))
+#define DFORK_BOFF(inode) ((int)((inode)->ForkOffset() << 3))
 
-#define DFORK_DSIZE(ino, volume) \
-	((ino)->di_forkoff ? DFORK_BOFF(ino) : LITINO(volume))
-#define DFORK_ASIZE(ino, volume) \
-	((ino)->di_forkoff ? LITINO(volume) - DFORK_BOFF(ino) : 0)
-#define DFORK_SIZE(ino, volume, w) \
+#define DFORK_DSIZE(inode) \
+	((inode)->ForkOffset() ? DFORK_BOFF(inode) : LITINO((inode)->GetVolume()))
+#define DFORK_ASIZE(inode) \
+	((inode)->ForkOffset() ? LITINO((inode)->GetVolume()) - DFORK_BOFF(inode) : 0)
+#define DFORK_SIZE(inode, w) \
 	((w) == XFS_DATA_FORK ? \
-		DFORK_DSIZE(ino, volume) : DFORK_ASIZE(ino, volume))
+		DFORK_DSIZE(inode) : DFORK_ASIZE(inode))
 
 
 #define INO_MASK(x)	((1ULL << (x)) - 1)
@@ -80,8 +81,8 @@
 #define XFS_DFORK_NEXTENTS(ino, w) \
 	((w) == XFS_DATA_FORK ? (ino)->di_nextents : (ino)->di_naextents)
 
-#define DFORK_MAXEXT(ino, volume, w) \
-	(DFORK_SIZE(ino, volume, w) / (2 * sizeof(uint64)))
+#define DFORK_MAXEXT(inode, w) \
+	(DFORK_SIZE(inode, w) / (2 * sizeof(uint64)))
 
 
 struct LongBlock;  // Forward declaration to remove cyclic dependency
@@ -126,18 +127,6 @@ struct BlockInfoV5 {
 };
 
 #define XFS_BLOCK_CRC_OFF offsetof(struct BlockInfoV5, crc)
-
-
-struct ExtentMapEntry {
-			xfs_fileoff_t		br_startoff;
-				// logical file block offset
-			xfs_fsblock_t		br_startblock;
-				// absolute block number
-			xfs_filblks_t		br_blockcount;
-				// # of blocks
-			uint8				br_state;
-				// state of the extent
-};
 
 
 /*
@@ -258,7 +247,7 @@ enum xfs_dinode_fmt_t {
 #define XFS_DIFLAG2_BIGTIME_BIT 3
 #define XFS_DIFLAG2_NREXT64_BIT 4
 #define XFS_DIFLAG2_BIGTIME (1ULL << XFS_DIFLAG2_BIGTIME_BIT)
-#define XFS_DIFLAG2_NREXT64 (1ULL << XFS_DIFLAG2_BIGTIME_BIT)
+#define XFS_DIFLAG2_NREXT64 (1ULL << XFS_DIFLAG2_NREXT64_BIT)
 
 
 /*
@@ -364,7 +353,7 @@ public:
 
 			mode_t				Mode() const { return fNode->di_mode; }
 
-			Volume*				GetVolume() { return fVolume;}
+			Volume*				GetVolume() const { return fVolume; }
 
 			int8				Format() const { return fNode->di_format; }
 
@@ -412,24 +401,8 @@ public:
 			uint64				FileSystemBlockToAddr(uint64 block);
 			uint8				ForkOffset() const
 									{ return fNode->di_forkoff; }
-			status_t			ReadExtents();
 			status_t			ReadAt(off_t pos, uint8* buffer, size_t* length);
-			status_t			GetNodefromTree(uint16& levelsInTree,
-									Volume* volume, ssize_t& len,
-									size_t DirBlockSize, char* block);
-			int					SearchMapInAllExtent(uint64 blockNo);
-			void				UnWrapExtentFromWrappedEntry(
-									uint64 wrappedExtent[2],
-									ExtentMapEntry* entry);
-			status_t			ReadExtentsFromExtentBasedInode();
-			status_t			ReadExtentsFromTreeInode();
-			size_t				MaxRecordsPossibleInTreeRoot();
-			size_t				MaxRecordsPossibleNode();
-			TreePointer*		GetPtrFromRoot(int pos);
-			TreePointer*		GetPtrFromNode(int pos, void* buffer);
-			size_t				GetPtrOffsetIntoRoot(int pos);
-			size_t				GetPtrOffsetIntoNode(int pos);
-			uint32				SizeOfLongBlock();
+			Extent*				GetDataExtent();
 private:
 			xfs_timestamp_t		_ConvertLegacyToBigTimestamp(xfs_legacy_timestamp* lts) const;
 			bool				_IsBigtimeEnabled() const
@@ -446,7 +419,7 @@ private:
 			Volume*				fVolume;
 			char*				fBuffer;
 				// Contains the disk inode in BE format
-			ExtentMapEntry*		fExtents;
+			Extent*				fDataExtent;
 };
 
 #endif

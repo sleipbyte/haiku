@@ -128,7 +128,7 @@ Inode::Inode(Volume* volume, xfs_ino_t id)
 	fId(id),
 	fVolume(volume),
 	fBuffer(NULL),
-	fExtents(NULL)
+	fDataExtent(NULL)
 {
 }
 
@@ -168,14 +168,14 @@ Inode::VerifyFork(int whichFork) const
 		if (whichFork == XFS_DATA_FORK) {
 			if (S_ISREG(Mode()))
 				return false;
-			if (Size() > (xfs_fsize_t) DFORK_SIZE(fNode, fVolume, whichFork))
+			if (Size() > (xfs_fsize_t) DFORK_SIZE(this, whichFork))
 				return false;
 		}
 		if (di_nextents)
 			return false;
 		break;
 	case XFS_DINODE_FMT_EXTENTS:
-		if (di_nextents > DFORK_MAXEXT(fNode, fVolume, whichFork))
+		if (di_nextents > DFORK_MAXEXT(this, whichFork))
 			return false;
 		break;
 	case XFS_DINODE_FMT_BTREE:
@@ -376,6 +376,12 @@ Inode::Init()
 	if (fBuffer == NULL)
 		return B_NO_MEMORY;
 
+	// Initialise data extents, note that ram tree will be populated when first extent
+	// would need to be accessed.
+	fDataExtent = new(std::nothrow) Extent(this);
+	if (fDataExtent == NULL)
+		return B_NO_MEMORY;
+
 	status_t status = _GetFromDisk();
 	if (status == B_OK) {
 		if (VerifyInode()) {
@@ -395,7 +401,7 @@ Inode::~Inode()
 {
 	delete fNode;
 	delete[] fBuffer;
-	delete[] fExtents;
+	delete fDataExtent;
 }
 
 
@@ -421,257 +427,10 @@ Inode::CheckPermissions(int accessMode) const
 }
 
 
-uint32
-Inode::SizeOfLongBlock()
-{
-	if (Version() == 3)
-		return sizeof(LongBlock);
-	else
-		return LongBlock::Offset_v5();
-}
-
-
-void
-Inode::UnWrapExtentFromWrappedEntry(uint64 wrappedExtent[2],
-	ExtentMapEntry* entry)
-{
-		uint64 first = B_BENDIAN_TO_HOST_INT64(wrappedExtent[0]);
-		uint64 second = B_BENDIAN_TO_HOST_INT64(wrappedExtent[1]);
-		entry->br_state = first >> 63;
-		entry->br_startoff = (first & MASK(63)) >> 9;
-		entry->br_startblock = ((first & MASK(9)) << 43) | (second >> 21);
-		entry->br_blockcount = second & MASK(21);
-}
-
-
-status_t
-Inode::ReadExtentsFromExtentBasedInode()
-{
-	fExtents = new(std::nothrow) ExtentMapEntry[DataExtentsCount()];
-	char* dataStart = (char*) DIR_DFORK_PTR(Buffer(), CoreInodeSize());
-	uint64 wrappedExtent[2];
-	for (xfs_extnum_t i = 0; i < DataExtentsCount(); i++) {
-		wrappedExtent[0] = *(uint64*)(dataStart);
-		wrappedExtent[1] = *(uint64*)(dataStart + sizeof(uint64));
-		dataStart += 2 * sizeof(uint64);
-		UnWrapExtentFromWrappedEntry(wrappedExtent, &fExtents[i]);
-	}
-	return B_OK;
-}
-
-
-size_t
-Inode::MaxRecordsPossibleInTreeRoot()
-{
-	size_t lengthOfDataFork;
-	if (ForkOffset() != 0)
-		lengthOfDataFork = ForkOffset() << 3;
-	else if (ForkOffset() == 0)
-		lengthOfDataFork = GetVolume()->InodeSize() - CoreInodeSize();
-
-	lengthOfDataFork -= sizeof(BlockInDataFork);
-	return lengthOfDataFork / (XFS_KEY_SIZE + XFS_PTR_SIZE);
-}
-
-
-size_t
-Inode::GetPtrOffsetIntoRoot(int pos)
-{
-	size_t maxRecords = MaxRecordsPossibleInTreeRoot();
-	return (sizeof(BlockInDataFork)
-		+ maxRecords * XFS_KEY_SIZE + (pos - 1) * XFS_PTR_SIZE);
-}
-
-
-TreePointer*
-Inode::GetPtrFromRoot(int pos)
-{
-	return (TreePointer*)
-		((char*)DIR_DFORK_PTR(Buffer(), CoreInodeSize()) + GetPtrOffsetIntoRoot(pos));
-}
-
-
-size_t
-Inode::MaxRecordsPossibleNode()
-{
-	size_t availableSpace = GetVolume()->BlockSize();
-	return availableSpace / (XFS_KEY_SIZE + XFS_PTR_SIZE);
-}
-
-
-size_t
-Inode::GetPtrOffsetIntoNode(int pos)
-{
-	size_t maxRecords = MaxRecordsPossibleNode();
-
-	return SizeOfLongBlock() + maxRecords * XFS_KEY_SIZE
-		+ (pos - 1) * XFS_PTR_SIZE;
-}
-
-
-TreePointer*
-Inode::GetPtrFromNode(int pos, void* buffer)
-{
-	size_t offsetIntoNode = GetPtrOffsetIntoNode(pos);
-	return (TreePointer*)((char*)buffer + offsetIntoNode);
-}
-
-
-status_t
-Inode::GetNodefromTree(uint16& levelsInTree, Volume* volume,
-	ssize_t& len, size_t DirBlockSize, char* block) {
-
-	char* node = new(std::nothrow) char[len];
-	if (node == NULL)
-		return B_NO_MEMORY;
-		// This isn't for a directory block but for one of the tree nodes
-
-	ArrayDeleter<char> nodeDeleter(node);
-
-	TRACE("levels:(%" B_PRIu16 ")\n", levelsInTree);
-
-	TreePointer* ptrToNode = GetPtrFromRoot(1);
-	uint64 fileSystemBlockNo = B_BENDIAN_TO_HOST_INT64(*ptrToNode);
-	uint64 readPos = FileSystemBlockToAddr(fileSystemBlockNo);
-		// Go down the tree by taking the leftmost pointer to the first leaf
-	while (levelsInTree != 1) {
-		fileSystemBlockNo = B_BENDIAN_TO_HOST_INT64(*ptrToNode);
-			// The fs block that contains node at next lower level. Now read.
-		readPos = FileSystemBlockToAddr(fileSystemBlockNo);
-		if (read_pos(volume->Device(), readPos, node, len) != len) {
-			ERROR("Extent::FillBlockBuffer(): IO Error");
-			return B_IO_ERROR;
-		}
-		LongBlock* curLongBlock = (LongBlock*)node;
-		if (!VerifyHeader<LongBlock>(curLongBlock, node, this,
-				0, NULL, XFS_BTREE)) {
-			TRACE("Invalid Long Block");
-			return B_BAD_VALUE;
-		}
-		ptrToNode = GetPtrFromNode(1, (void*)curLongBlock);
-			// Get's the first pointer. This points to next node.
-		levelsInTree--;
-	}
-	// Next level wil contain leaf nodes. Now Read Directory Buffer
-	len = DirBlockSize;
-	if (read_pos(volume->Device(), readPos, block, len)
-		!= len) {
-		ERROR("Extent::FillBlockBuffer(): IO Error");
-		return B_IO_ERROR;
-	}
-	levelsInTree--;
-	if (levelsInTree != 0)
-		return B_BAD_VALUE;
-	return B_OK;
-}
-
-
-status_t
-Inode::ReadExtentsFromTreeInode()
-{
-	fExtents = new(std::nothrow) ExtentMapEntry[DataExtentsCount()];
-	BlockInDataFork* root = new(std::nothrow) BlockInDataFork;
-	if (root == NULL)
-		return B_NO_MEMORY;
-	memcpy((void*)root,
-		DIR_DFORK_PTR(Buffer(), CoreInodeSize()), sizeof(BlockInDataFork));
-
-	uint16 levelsInTree = root->Levels();
-	delete root;
-
-	Volume* volume = GetVolume();
-	ssize_t len = volume->BlockSize();
-
-	len = DirBlockSize();
-	char* block = new(std::nothrow) char[len];
-	if (block == NULL)
-		return B_NO_MEMORY;
-
-	ArrayDeleter<char> blockDeleter(block);
-
-	GetNodefromTree(levelsInTree, volume, len, DirBlockSize(), block);
-
-	uint64 fileSystemBlockNo;
-	uint64 wrappedExtent[2];
-	int indexIntoExtents = 0;
-	// We should be at the left most leaf node.
-	// This could be a multilevel node type directory
-	while (1) {
-		// Run till you have leaf blocks to checkout
-		char* leafBuffer = block;
-		if (!VerifyHeader<LongBlock>((LongBlock*)leafBuffer, leafBuffer, this,
-				0, NULL, XFS_BTREE)) {
-			TRACE("Invalid Long Block");
-			return B_BAD_VALUE;
-		}
-
-		uint32 offset = SizeOfLongBlock();
-		int numRecs = ((LongBlock*)leafBuffer)->NumRecs();
-
-		for (int i = 0; i < numRecs; i++) {
-			wrappedExtent[0] = *(uint64*)(leafBuffer + offset);
-			wrappedExtent[1]
-				= *(uint64*)(leafBuffer + offset + sizeof(uint64));
-			offset += sizeof(ExtentMapUnwrap);
-			UnWrapExtentFromWrappedEntry(wrappedExtent,
-				&fExtents[indexIntoExtents]);
-			indexIntoExtents++;
-		}
-
-		fileSystemBlockNo = ((LongBlock*)leafBuffer)->Right();
-		TRACE("Next leaf is at: (%" B_PRIu64 ")\n", fileSystemBlockNo);
-		if (fileSystemBlockNo == (uint64) -1)
-			break;
-		uint64 readPos = FileSystemBlockToAddr(fileSystemBlockNo);
-		if (read_pos(volume->Device(), readPos, block, len)
-				!= len) {
-				ERROR("Extent::FillBlockBuffer(): IO Error");
-				return B_IO_ERROR;
-		}
-	}
-	TRACE("Total covered: (%" B_PRId32 ")\n", indexIntoExtents);
-	return B_OK;
-}
-
-
-status_t
-Inode::ReadExtents()
-{
-	if (fExtents != NULL)
-		return B_OK;
-	if (Format() == XFS_DINODE_FMT_BTREE)
-		return ReadExtentsFromTreeInode();
-	if (Format() == XFS_DINODE_FMT_EXTENTS)
-		return ReadExtentsFromExtentBasedInode();
-	return B_BAD_VALUE;
-}
-
-
-int
-Inode::SearchMapInAllExtent(uint64 blockNo)
-{
-	for (xfs_extnum_t i = 0; i < DataExtentsCount(); i++) {
-		if (fExtents[i].br_startoff <= blockNo
-			&& (blockNo <= fExtents[i].br_startoff
-				+ fExtents[i].br_blockcount - 1)) {
-			// Map found
-			return i;
-		}
-	}
-	return -1;
-}
-
-
 status_t
 Inode::ReadAt(off_t pos, uint8* buffer, size_t* length)
 {
 	TRACE("Inode::ReadAt: pos:(%" B_PRIdOFF "), *length:(%" B_PRIuSIZE ")\n", pos, *length);
-	status_t status;
-	if (fExtents == NULL) {
-		status = ReadExtents();
-		if (status != B_OK)
-			return status;
-	}
 
 	// set/check boundaries for pos/length
 	if (pos < 0) {
@@ -687,70 +446,46 @@ Inode::ReadAt(off_t pos, uint8* buffer, size_t* length)
 		return B_NO_ERROR;
 	}
 
-	uint32 blockNo = BLOCKNO_FROM_POSITION(pos, GetVolume());
-	uint32 offsetIntoBlock = BLOCKOFFSET_FROM_POSITION(pos, this);
-
+	size_t lengthToRead = Size() - pos;
+	if (*length < lengthToRead)
+		lengthToRead = *length;
 	ssize_t lengthOfBlock = BlockSize();
-	char* block = new(std::nothrow) char[lengthOfBlock];
-	if (block == NULL)
-		return B_NO_MEMORY;
-
-	ArrayDeleter<char> blockDeleter(block);
-
 	size_t lengthRead = 0;
-	size_t lengthLeftInFile;
-	size_t lengthLeftInBlock;
-	size_t lengthToRead;
 	TRACE("What is blockLen:(%" B_PRId64 ")\n", lengthOfBlock);
-	while (*length > 0) {
+
+	while (lengthToRead > 0) {
 		TRACE("Inode::ReadAt: pos:(%" B_PRIdOFF "), *length:(%" B_PRIuSIZE ")\n", pos, *length);
-		// As long as you can read full blocks, read.
-		lengthLeftInFile = Size() - pos;
-		lengthLeftInBlock = lengthOfBlock - offsetIntoBlock;
-
-		/*
-			We will read file in blocks of size 4096 bytes, if that
-			is not possible we will read file of remaining bytes.
-			This meathod will change when we will add file cache for xfs.
-		*/
-		if (lengthLeftInFile >= 4096)
-			*length = 4096;
-		else
-			*length = lengthLeftInFile;
-
-		// We could be almost at the end of the file
-		if (lengthLeftInFile <= lengthLeftInBlock)
-			lengthToRead = lengthLeftInFile;
-		else lengthToRead = lengthLeftInBlock;
-
-		// But we might not be able to read all of the
-		// data because of less buffer length
-		if (lengthToRead > *length)
-			lengthToRead = *length;
-
-		int indexForMap = SearchMapInAllExtent(blockNo);
-		if (indexForMap == -1)
+		ExtentMapEntry extent;
+		bool found = fDataExtent->Search(pos / lengthOfBlock, &extent);
+		// TODO: Implement sparse file support
+		if (!found) {
+			ERROR("Inode::ReadAt(): Extent not found");
 			return B_BAD_VALUE;
-
-		xfs_daddr_t readPos
-			= FileSystemBlockToAddr(fExtents[indexForMap].br_startblock
-				+ blockNo - fExtents[indexForMap].br_startoff);
-
-		if (read_pos(GetVolume()->Device(), readPos, block, lengthOfBlock)
-			!= lengthOfBlock) {
-			ERROR("TreeDirectory::FillBlockBuffer(): IO Error");
-			return B_IO_ERROR;
 		}
 
-		if (user_memcpy((void*)(buffer + lengthRead),
-				(void*)(block + offsetIntoBlock), lengthToRead) < B_OK)
-			return B_BAD_ADDRESS;
+		off_t extentStartPos = extent.br_startoff * lengthOfBlock;
+		off_t extentEndPos = (extent.br_startoff + extent.br_blockcount) * lengthOfBlock;
 
-		pos += lengthToRead;
-		*length -= lengthToRead;
-		lengthRead += lengthToRead;
-		blockNo = BLOCKNO_FROM_POSITION(pos, GetVolume());
-		offsetIntoBlock = BLOCKOFFSET_FROM_POSITION(pos, this);
+		// TODO: Implement sparse file support
+		if (pos < extentStartPos)
+			return B_BAD_VALUE;
+
+		// The returned extent covers pos
+		ssize_t length = lengthToRead; 
+		if (extentEndPos - pos < length)
+			length = extentEndPos - pos;
+		uint64 offsetWithinExtent = pos - extentStartPos;
+		uint64 readPos = FileSystemBlockToAddr(extent.br_startblock) + offsetWithinExtent;
+		// ERROR("LengthToRead = %lld", lengthToRead);
+		// ERROR("length = %lld", length);
+		// ERROR("readPos = %lld", readPos);
+		if (read_pos(fVolume->Device(), readPos, buffer + lengthRead, length) != length) {
+			ERROR("Inode::ReadAt(): IO Error");
+			return B_IO_ERROR;
+		}
+		pos += length;
+		lengthRead += length;
+		lengthToRead -= length;
 	}
 
 	TRACE("lengthRead:(%" B_PRIuSIZE ")\n", lengthRead);
@@ -820,4 +555,11 @@ Inode::FileSystemBlockToAddr(uint64 block)
 
 	uint64 readPos = actualBlockToRead * (XFS_MIN_BLOCKSIZE);
 	return readPos;
+}
+
+
+Extent*
+Inode::GetDataExtent()
+{
+	return fDataExtent;
 }

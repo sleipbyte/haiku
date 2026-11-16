@@ -57,6 +57,8 @@ public:
 
 	static	uint32				CRCOffset();
 
+	static	uint32				Size(Inode* inode);
+
 private:
 
 			uint32				bb_magic;
@@ -72,18 +74,6 @@ private:
 			uint64				bb_owner;
 			uint32				bb_crc;
 			uint32				bb_pad;
-};
-
-
-/* We have an array of extent records in
- * the leaf node along with above headers
- * The behaviour is very much like node directories.
- */
-
-
-struct ExtentMapUnwrap {
-			uint64				first;
-			uint64				second;
 };
 
 

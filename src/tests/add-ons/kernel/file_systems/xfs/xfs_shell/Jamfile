@@ -14,7 +14,7 @@ DEFINES += HAIKU_BUILD_COMPATIBILITY_H __STRICT_ANSI__ ;
 
 	defines = [ FDefines $(defines) ] ;
 
-	local c++flags = ;
+	local c++flags = -std=c++11 ;
 
 	SubDirCcFlags $(defines) -Wno-multichar ;
 	SubDirC++Flags $(defines) $(c++flags) -Wno-multichar -fno-rtti ;
@@ -45,6 +45,7 @@ local xfsSource =
 	BlockDirectory.cpp
 	BPlusTree.cpp
 	Directory.cpp
+	Extent.cpp
 	Inode.cpp
 	kernel_interface.cpp
 	LeafAttribute.cpp

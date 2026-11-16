@@ -25,6 +25,7 @@ local xfsSources =
 	BlockDirectory.cpp
 	BPlusTree.cpp
 	Directory.cpp
+	Extent.cpp
 	Inode.cpp
 	kernel_interface.cpp
 	LeafAttribute.cpp

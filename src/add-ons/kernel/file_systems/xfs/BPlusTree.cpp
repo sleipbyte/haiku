@@ -63,7 +63,7 @@ TreeDirectory::InitCheck()
 uint32
 TreeDirectory::BlockLen()
 {
-	return fInode->SizeOfLongBlock();
+	return LongBlock::Size(fInode);
 }
 
 
@@ -292,12 +292,6 @@ TreeDirectory::GetAllExtents()
 	Volume* volume = fInode->GetVolume();
 	ssize_t len = volume->BlockSize();
 
-	uint16 levelsInTree = fRoot->Levels();
-	status_t status = fInode->GetNodefromTree(levelsInTree, volume, len,
-		fInode->DirBlockSize(), fSingleDirBlock);
-	if (status != B_OK)
-		return status;
-
 	// We should be at the left most leaf node.
 	// This could be a multilevel node type directory
 	uint64 fileSystemBlockNo;
@@ -310,7 +304,7 @@ TreeDirectory::GetAllExtents()
 			return B_BAD_VALUE;
 		}
 
-		uint32 offset = fInode->SizeOfLongBlock();
+		uint32 offset = LongBlock::Size(fInode);
 		int numRecs = ((LongBlock*)leafBuffer)->NumRecs();
 
 		for (int i = 0; i < numRecs; i++) {
@@ -335,9 +329,7 @@ TreeDirectory::GetAllExtents()
 	}
 	TRACE("Total covered: (%" B_PRIu32 ")\n", fCountOfFilledExtents);
 
-	status = UnWrapExtents(extentsWrapped);
-
-	return status;
+	return UnWrapExtents(extentsWrapped);
 }
 
 
@@ -852,4 +844,14 @@ uint32
 LongBlock::CRCOffset()
 {
 	return offsetof(LongBlock, bb_crc);
+}
+
+
+uint32
+LongBlock::Size(Inode* inode)
+{
+	if (inode->Version() == 3)
+		return sizeof(LongBlock);
+	else
+		return LongBlock::Offset_v5();
 }
