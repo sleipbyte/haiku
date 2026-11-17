@@ -70,18 +70,6 @@ DirectoryIterator::Init(Inode* inode)
 		delete nodeDir;
 	}
 
-	if (inode->Format() == XFS_DINODE_FMT_BTREE) {
-		TRACE("Iterator:Init(): B+TREE");
-		TreeDirectory* treeDir = new(std::nothrow) TreeDirectory(inode);
-		if (treeDir == NULL)
-			return NULL;
-
-		status_t status = treeDir->InitCheck();
-
-		if (status == B_OK)
-			return treeDir;
-	}
-
 	// Invalid format return NULL
 	return NULL;
 }

@@ -6,13 +6,7 @@
 #define _BPLUS_TREE_H_
 
 
-#include "Directory.h"
-#include "BlockDirectory.h"
 #include "Inode.h"
-#include "LeafDirectory.h"
-#include "NodeDirectory.h"
-#include "system_dependencies.h"
-#include "Utility.h"
 
 
 /*
@@ -74,81 +68,6 @@ private:
 			uint64				bb_owner;
 			uint32				bb_crc;
 			uint32				bb_pad;
-};
-
-
-/*
- * Using the structure to prevent re-reading of already read blocks during
- * a traversal of tree.
- *
- * type:
- * 0, if its an unused node, 1 if blockData size is a single block,
- * 2 if blockData size is directory block size.
- */
-struct PathNode {
-			int					type;
-			char*				blockData;
-			uint32				blockNumber;
-				// This is the file system block number
-};
-
-
-/*
- * This class should handle B+Tree based directories
- */
-class TreeDirectory : public DirectoryIterator {
-public:
-								TreeDirectory(Inode* inode);
-								~TreeDirectory();
-			status_t			InitCheck();
-			status_t			Rewind();
-			status_t			GetNext(char* name, size_t* length,
-									xfs_ino_t* ino);
-			status_t			Lookup(const char* name, size_t length,
-									xfs_ino_t* id);
-			int					EntrySize(int len) const;
-			uint32				BlockLen();
-			size_t				PtrSize();
-			size_t				KeySize();
-			TreeKey*			GetKeyFromNode(int pos, void* buffer);
-			TreePointer*		GetPtrFromNode(int pos, void* buffer);
-			TreeKey*			GetKeyFromRoot(int pos);
-			TreePointer*		GetPtrFromRoot(int pos);
-			status_t			SearchMapInAllExtent(uint64 blockNo,
-									uint32& mapIndex);
-			status_t			GetAllExtents();
-			size_t				MaxRecordsPossibleRoot();
-			size_t				MaxRecordsPossibleNode();
-			void				FillMapEntry(int num, ExtentMapEntry** map,
-									int type, int pathIndex);
-			status_t			FillBuffer(char* blockBuffer,
-									int howManyBlocksFurther,
-									ExtentMapEntry* targetMap = NULL);
-			size_t				GetPtrOffsetIntoNode(int pos);
-			size_t				GetPtrOffsetIntoRoot(int pos);
-			status_t			SearchAndFillPath(uint32 offset, int type);
-			status_t			SearchOffsetInTreeNode (uint32 offset,
-									TreePointer** pointer, int pathIndex);
-			void				SearchForMapInDirectoryBlock (uint64 blockNo,
-									int entries, ExtentMapEntry** map,
-									int type, int pathIndex);
-			uint32				SearchForHashInNodeBlock(uint32 hashVal);
-private:
-	inline	status_t			UnWrapExtents(ExtentMapUnwrap* extentsWrapped);
-
-private:
-			Inode*				fInode;
-			status_t			fInitStatus;
-			BlockInDataFork*	fRoot;
-			ExtentMapEntry*		fExtents;
-			uint32				fCountOfFilledExtents;
-			char*				fSingleDirBlock;
-			uint32				fOffsetOfSingleDirBlock;
-			uint32				fCurMapIndex;
-			uint64				fOffset;
-			uint32				fCurBlockNumber;
-			PathNode			fPathForLeaves[MAX_TREE_DEPTH];
-			PathNode			fPathForData[MAX_TREE_DEPTH];
 };
 
 #endif

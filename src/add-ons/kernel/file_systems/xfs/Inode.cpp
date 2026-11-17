@@ -476,9 +476,6 @@ Inode::ReadAt(off_t pos, uint8* buffer, size_t* length)
 			length = extentEndPos - pos;
 		uint64 offsetWithinExtent = pos - extentStartPos;
 		uint64 readPos = FileSystemBlockToAddr(extent.br_startblock) + offsetWithinExtent;
-		// ERROR("LengthToRead = %lld", lengthToRead);
-		// ERROR("length = %lld", length);
-		// ERROR("readPos = %lld", readPos);
 		if (read_pos(fVolume->Device(), readPos, buffer + lengthRead, length) != length) {
 			ERROR("Inode::ReadAt(): IO Error");
 			return B_IO_ERROR;
