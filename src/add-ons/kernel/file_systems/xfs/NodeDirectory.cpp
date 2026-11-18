@@ -73,15 +73,6 @@ NodeDirectory::Init()
 }
 
 
-bool
-NodeDirectory::IsNodeType()
-{
-	if (fFirstLeafMapIndex == -1UL)
-		return false;
-	return true;
-}
-
-
 void
 NodeDirectory::FillMapEntry(int num, ExtentMapEntry* fMap)
 {
@@ -140,7 +131,7 @@ NodeDirectory::FillBuffer(int type, char* blockBuffer, int howManyBlocksFurthur)
 		if(header == NULL)
 			return B_NO_MEMORY;
 		if (!VerifyHeader<DataHeader>(header, fDataBuffer, fInode,
-				howManyBlocksFurthur, fDataMap, XFS_NODE)) {
+				howManyBlocksFurthur, fDataMap, XFS_DIR_NODE)) {
 			ERROR("DATA BLOCK INVALID\n");
 			delete header;
 			return B_BAD_VALUE;
@@ -160,7 +151,7 @@ NodeDirectory::FillBuffer(int type, char* blockBuffer, int howManyBlocksFurthur)
 		if ((leaf->Magic() == XFS_DIR2_LEAFN_MAGIC
 				|| leaf->Magic() == XFS_DIR3_LEAFN_MAGIC)
 			&& !VerifyHeader<LeafHeader>(leaf, fLeafBuffer, fInode,
-				howManyBlocksFurthur, fLeafMap, XFS_NODE)) {
+				howManyBlocksFurthur, fLeafMap, XFS_DIR_NODE)) {
 			TRACE("Leaf block invalid");
 			delete leaf;
 			return B_BAD_VALUE;
@@ -175,7 +166,7 @@ NodeDirectory::FillBuffer(int type, char* blockBuffer, int howManyBlocksFurthur)
 		if ((node->Magic() == XFS_DA_NODE_MAGIC
 				|| node->Magic() == XFS_DA3_NODE_MAGIC)
 			&& !VerifyHeader<NodeHeader>(node, fLeafBuffer, fInode,
-				howManyBlocksFurthur, fLeafMap, XFS_NODE)) {
+				howManyBlocksFurthur, fLeafMap, XFS_DIR_NODE)) {
 			TRACE("Node block invalid");
 			delete node;
 			return B_BAD_VALUE;

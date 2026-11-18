@@ -26,15 +26,6 @@
 #define LEAF_STARTOFFSET(n) 1UL << (35 - (n))
 
 
-// Enum values to check which directory we are reading
-enum DirectoryType {
-	XFS_BLOCK,
-	XFS_LEAF,
-	XFS_NODE,
-	XFS_BTREE,
-};
-
-
 // xfs_dir2_data_free_t
 struct FreeRegion {
 			uint16				offset;
@@ -162,7 +153,6 @@ public:
 								BlockDirectory(Inode* inode);
 								~BlockDirectory();
 			status_t			Init();
-			bool				IsBlockType();
 			void				FillMapEntry(void* pointerToMap);
 			status_t			FillBlockBuffer();
 			BlockTail*			GetBlockTail();

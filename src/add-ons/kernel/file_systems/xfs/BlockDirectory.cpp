@@ -73,7 +73,6 @@ BlockDirectory::Init()
 	if (fMap == NULL)
 		return B_NO_MEMORY;
 
-	ASSERT(IsBlockType() == true);
 	void* pointerToMap = DIR_DFORK_PTR(fInode->Buffer(), fInode->CoreInodeSize());
 	FillMapEntry(pointerToMap);
 	ASSERT(fMap->br_blockcount == 1);
@@ -87,7 +86,7 @@ BlockDirectory::Init()
 	DataHeader* header = DataHeader::Create(fInode, fBlockBuffer);
 	if (header == NULL)
 		return B_NO_MEMORY;
-	if (!VerifyHeader<DataHeader>(header, fBlockBuffer, fInode, 0, fMap, XFS_BLOCK)) {
+	if (!VerifyHeader<DataHeader>(header, fBlockBuffer, fInode, 0, fMap, XFS_DIR_BLOCK)) {
 		status = B_BAD_VALUE;
 		ERROR("Extent:Init(): Bad Block!\n");
 	}
@@ -118,22 +117,6 @@ LeafEntry*
 BlockDirectory::BlockFirstLeaf(BlockTail* tail)
 {
 	return (LeafEntry*)tail - B_BENDIAN_TO_HOST_INT32(tail->count);
-}
-
-
-bool
-BlockDirectory::IsBlockType()
-{
-	bool status = true;
-	if (fInode->BlockCount() != 1)
-		status = false;
-	if (fInode->Size() != fInode->DirBlockSize())
-		status = false;
-	void* pointerToMap = DIR_DFORK_PTR(fInode->Buffer(), fInode->CoreInodeSize());
-	xfs_fileoff_t startoff = (*((uint64*)pointerToMap) & MASK(63)) >> 9;
-	if (startoff != 0)
-		status = false;
-	return status;
 }
 
 
@@ -265,7 +248,7 @@ DataHeader::~DataHeader()
 uint32
 DataHeader::ExpectedMagic(int8 WhichDirectory, Inode* inode)
 {
-	if (WhichDirectory == XFS_BLOCK) {
+	if (WhichDirectory == XFS_DIR_BLOCK) {
 		if (inode->Version() == 1 || inode->Version() == 2)
 			return DIR2_BLOCK_HEADER_MAGIC;
 		else

@@ -100,7 +100,6 @@ public:
 								NodeDirectory(Inode* inode);
 								~NodeDirectory();
 			status_t			Init();
-			bool				IsNodeType();
 			void				FillMapEntry(int num, ExtentMapEntry* map);
 			status_t			FillBuffer(int type, char* buffer,
 									int howManyBlocksFurther);

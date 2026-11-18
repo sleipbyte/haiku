@@ -54,7 +54,7 @@ LeafDirectory::Init()
 	DataHeader* data = DataHeader::Create(fInode, fDataBuffer);
 	if (data == NULL)
 		return B_NO_MEMORY;
-	if (!VerifyHeader<DataHeader>(data, fDataBuffer, fInode, 0, fDataMap, XFS_LEAF)) {
+	if (!VerifyHeader<DataHeader>(data, fDataBuffer, fInode, 0, fDataMap, XFS_DIR_LEAF)) {
 		ERROR("Invalid data header");
 		delete data;
 		return B_BAD_VALUE;
@@ -68,7 +68,7 @@ LeafDirectory::Init()
 	LeafHeader* leaf = LeafHeader::Create(fInode, fLeafBuffer);
 	if (leaf == NULL)
 		return B_NO_MEMORY;
-	if (!VerifyHeader<LeafHeader>(leaf, fLeafBuffer, fInode, 0, fLeafMap, XFS_LEAF)) {
+	if (!VerifyHeader<LeafHeader>(leaf, fLeafBuffer, fInode, 0, fLeafMap, XFS_DIR_LEAF)) {
 		ERROR("Invalid leaf header");
 		delete leaf;
 		return B_BAD_VALUE;
@@ -76,33 +76,6 @@ LeafDirectory::Init()
 	delete leaf;
 
 	return B_OK;
-}
-
-
-bool
-LeafDirectory::IsLeafType()
-{
-	bool status = true;
-	if (fInode->BlockCount() == 1
-		|| fInode->DataExtentsCount() == 1
-		|| (uint64) fInode->Size() !=
-			(fInode->BlockCount() - 1) * fInode->DirBlockSize())
-		status = false;
-
-	if (status == false)
-		return status;
-
-	void* directoryFork = DIR_DFORK_PTR(fInode->Buffer(), fInode->CoreInodeSize());
-
-	uint64* pointerToMap = (uint64*)((char*)directoryFork
-		+ (fInode->DataExtentsCount() - 1) * EXTENT_SIZE);
-
-	xfs_fileoff_t startoff = (B_BENDIAN_TO_HOST_INT64(*pointerToMap) & MASK(63)) >> 9;
-
-	if (startoff != LEAF_STARTOFFSET(fInode->GetVolume()->BlockLog()))
-		status = false;
-
-	return status;
 }
 
 
@@ -408,7 +381,7 @@ LeafHeader::~LeafHeader()
 uint32
 LeafHeader::ExpectedMagic(int8 WhichDirectory, Inode* inode)
 {
-	if (WhichDirectory == XFS_LEAF) {
+	if (WhichDirectory == XFS_DIR_LEAF) {
 		if (inode->Version() == 1 || inode->Version() == 2)
 			return V4_LEAF_HEADER_MAGIC;
 		else

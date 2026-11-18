@@ -112,7 +112,8 @@ public:
 								~Extent();
 
 			bool				Search(xfs_fileoff_t key, ExtentMapEntry* extent);
-			status_t			Insert(ExtentMapUnwrap* extent, ExtentCursor& cur);
+			xfs_fileoff_t		GetLastOffset();
+			status_t			Insert(ExtentMapUnwrap* onDiskextent, ExtentCursor& cur);
 			ExtentCursor		FirstExtentCursor() const;
 			void				NextExtentCursor(ExtentCursor& cur) const;
 private:
@@ -132,13 +133,14 @@ private:
 			void				_UpdateNode(xfs_fileoff_t oldOffset,
 									xfs_fileoff_t newOffset, int level, void* ptr);
 			ExtentLeaf*			_FindFirstLeaf() const;
+			ExtentLeaf*			_FindLastLeaf() const;
 			void*				_FindNode(xfs_fileoff_t offset, int level) const;
 			int					_NodeInsertPosition(ExtentNode* node,
 									xfs_fileoff_t offset) const;
 			int					_NodeEntriesCount(ExtentNode* node, int start) const;
 			ExtentNode*			_SplitNode(ExtentNode*& node, int& pos,
 									int& nodeEntries);
-			void				_SwapEndian(ExtentMapUnwrap* entent) const;
+			ExtentMapUnwrap		_SwapEndian(ExtentMapUnwrap* onDiskExtent) const;
 			void				_UnwrapExtent(ExtentMapUnwrap* extent,
 									ExtentMapEntry* entry) const;
 			bool				_ValidateExtent(ExtentMapEntry* entry) const;

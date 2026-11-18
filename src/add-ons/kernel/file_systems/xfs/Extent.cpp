@@ -68,6 +68,30 @@ Extent::Search(xfs_fileoff_t key, ExtentMapEntry* entry)
 }
 
 
+xfs_fileoff_t
+Extent::GetLastOffset()
+{
+	// Make sure we have already populated the extent tree
+	status_t status = _ReadExtents();
+	if (status != B_OK)
+		return -1ULL;
+
+	ExtentLeaf* leaf = _FindLastLeaf();
+	if (leaf == NULL)
+		return -1ULL;
+
+	int idx;
+	for (idx = 1; idx < RECS_PER_LEAF; idx++) {
+		if (leaf->recs[idx].second == 0)
+			break;
+	}
+
+	xfs_fileoff_t leafOffset = _LeafKey(leaf, idx - 1);
+	xfs_filblks_t len = leaf->recs[idx - 1].second & EXTENT_BLOCKCOUNT_MASK;
+	return leafOffset + len;
+}
+
+
 status_t
 Extent::_ReadExtents()
 {
@@ -216,11 +240,11 @@ Extent::_MaxRecordsPossibleInNode() const
 
 // Try to insert the new extent record at cursor
 status_t
-Extent::Insert(ExtentMapUnwrap* extent, ExtentCursor& cur)
+Extent::Insert(ExtentMapUnwrap* onDiskextent, ExtentCursor& cur)
 {
-	_SwapEndian(extent);
+	ExtentMapUnwrap extent = _SwapEndian(onDiskextent);
 	// key will be logical file offset
-	xfs_fileoff_t key = (extent->first >> 9) & EXTENT_STARTOFF_MASK;
+	xfs_fileoff_t key = (extent.first >> 9) & EXTENT_STARTOFF_MASK;
 	ExtentLeaf* newLeaf = NULL;
 	status_t status;
 
@@ -229,8 +253,8 @@ Extent::Insert(ExtentMapUnwrap* extent, ExtentCursor& cur)
 		ExtentLeaf* root = new(std::nothrow) ExtentLeaf();
 		if (root == NULL)
 			return B_NO_MEMORY;
-		root->recs[0].first = extent->first;
-		root->recs[0].second = extent->second;
+		root->recs[0].first = extent.first;
+		root->recs[0].second = extent.second;
 		root->prev = root->next = NULL;
 		// fData now points to this root
 		fData = root;
@@ -257,8 +281,8 @@ Extent::Insert(ExtentMapUnwrap* extent, ExtentCursor& cur)
 
 		for (int i = leafEntries; i > cur.pos; i--)
 			cur.leaf->recs[i] = cur.leaf->recs[i - 1];
-		cur.leaf->recs[cur.pos].first = extent->first;
-		cur.leaf->recs[cur.pos].second = extent->second;
+		cur.leaf->recs[cur.pos].first = extent.first;
+		cur.leaf->recs[cur.pos].second = extent.second;
         
 		// if we created new leaf then we need to insert key in parent nodes
 		if (newLeaf) {
@@ -583,11 +607,33 @@ Extent::_FindFirstLeaf() const
 }
 
 
-void
-Extent::_SwapEndian(ExtentMapUnwrap* extent) const
+ExtentLeaf*
+Extent::_FindLastLeaf() const
 {
-	extent->first = B_BENDIAN_TO_HOST_INT64(extent->first);
-	extent->second = B_BENDIAN_TO_HOST_INT64(extent->second);
+	if (fHeight == 0)
+		return NULL;
+	
+	void* node = fData;
+	int i;
+
+	for (int height = fHeight; height > 1; height--) {
+		for (i = 1; i < KEYS_PER_NODE; i++) {
+			if (((ExtentNode*)node)->keys[i] == XFS_IEXT_KEY_INVALID)
+				break;
+		}
+		node = ((ExtentNode*)node)->ptrs[i - 1];
+	}
+	return (ExtentLeaf*)node;
+}
+
+
+ExtentMapUnwrap
+Extent::_SwapEndian(ExtentMapUnwrap* onDiskextent) const
+{
+	ExtentMapUnwrap extent;
+	extent.first = B_BENDIAN_TO_HOST_INT64(onDiskextent->first);
+	extent.second = B_BENDIAN_TO_HOST_INT64(onDiskextent->second);
+	return extent;
 }
 
 

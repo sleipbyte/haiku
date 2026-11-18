@@ -110,7 +110,6 @@ public:
 								LeafDirectory(Inode* inode);
 								~LeafDirectory();
 			status_t			Init();
-			bool				IsLeafType();
 			void				FillMapEntry(int num, ExtentMapEntry* map);
 			status_t			FillBuffer(int type, char* buffer,
 									int howManyBlocksFurthur);
